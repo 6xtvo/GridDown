@@ -1,0 +1,11 @@
+pre-commit:
+  commands:
+    biome:
+      run: pnpm check:write {staged_files}
+      glob: "*.{ts,tsx,js,jsx,json}"
+      stage_fixed: true
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpx commitlint --edit {1}
