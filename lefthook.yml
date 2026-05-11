@@ -1,9 +1,13 @@
 pre-commit:
   commands:
+    stage-all:
+      run: git add -A
+      priority: 1
     biome:
       run: pnpm check:write {staged_files}
       glob: "*.{ts,tsx,js,jsx,json}"
       stage_fixed: true
+      priority: 2
 
 commit-msg:
   commands:
