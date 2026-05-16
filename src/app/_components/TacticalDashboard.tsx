@@ -268,7 +268,10 @@ export function TacticalDashboard() {
 						ChatMsg[]
 					>;
 					Object.entries(peerChats).forEach(([roomId, msgs]) => {
-						const room: ChatMsg[] = normalizeChatThread(roomId, merged[roomId] ?? []);
+						const room: ChatMsg[] = normalizeChatThread(
+							roomId,
+							merged[roomId] ?? [],
+						);
 						const peerThread = normalizeChatThread(roomId, msgs);
 						const dedupedRoom = [...room];
 						peerThread.forEach((msg) => {
