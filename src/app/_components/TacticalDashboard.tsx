@@ -149,6 +149,14 @@ export function TacticalDashboard() {
 	const [obErrors, setObErrors] = useState<ProfileErrors>({});
 	const [skillSearch, setSkillSearch] = useState("");
 
+	const getChatMessageId = (
+		room: string,
+		message: { msgId?: string; time: number; from: string; text: string },
+		index = 0,
+	) =>
+		message.msgId ??
+		`${room}:${message.time}:${message.from}:${message.text}:${index}`;
+
 	const base = profile ?? DEFAULT_LOCATION;
 
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -170,7 +178,19 @@ export function TacticalDashboard() {
 		const savedInc = localStorage.getItem("gd_incidents");
 		if (savedInc) setIncidents(JSON.parse(savedInc));
 		const savedChat = localStorage.getItem("gd_chats");
-		if (savedChat) setChatLogs(JSON.parse(savedChat));
+		if (savedChat) {
+			const parsed = JSON.parse(savedChat) as Record<string, ChatMsg[]>;
+			const normalized = Object.fromEntries(
+				Object.entries(parsed).map(([room, messages]) => [
+					room,
+					messages.map((message, index) => ({
+						...message,
+						msgId: getChatMessageId(room, message, index),
+					})),
+				]),
+			) as Record<string, ChatMsg[]>;
+			setChatLogs(normalized);
+		}
 	}, []);
 
 	useEffect(() => {
@@ -195,7 +215,16 @@ export function TacticalDashboard() {
 					const p = JSON.parse(String(m.data));
 					if (p.type !== "INCIDENT_CHAT") return;
 					const room = p.data.incidentId as string;
-					const msgId = p.data.msgId as string;
+					const msgId = getChatMessageId(
+						room,
+						{
+							msgId: typeof p.data.msgId === "string" ? p.data.msgId : m.id,
+							time: m.timestamp,
+							from: m.from,
+							text: String(p.data.text ?? ""),
+						},
+						updated[room]?.length ?? 0,
+					);
 					if (!updated[room]) updated[room] = [];
 					// FIX: deduplicate by msgId instead of timestamp
 					if (!updated[room].some((x) => x.msgId === msgId)) {
