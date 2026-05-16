@@ -64,7 +64,12 @@ export type Incident = {
 	time: string;
 };
 
-type ChatMsg = { from: string; text: string; time: number };
+type ChatMsg = {
+	from: string;
+	text: string;
+	image?: string | null;
+	time: number;
+};
 type RouteState = { geojson: GeoJSON.LineString; eta: number };
 
 const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
@@ -112,6 +117,9 @@ export function TacticalDashboard() {
 	const [hqDraft, setHqDraft] = useState<{ lat: number; lng: number } | null>(
 		null,
 	);
+
+	const [chatImage, setChatImage] = useState<string | null>(null);
+	const chatFileRef = useRef<HTMLInputElement>(null);
 
 	const [incidents, setIncidents] = useState<Incident[]>([]);
 	const [selected, setSelected] = useState<string | null>(null);
@@ -258,22 +266,30 @@ export function TacticalDashboard() {
 
 	const handleSendChat = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!chatInput.trim() || !selected || !profile) return;
+		if (!selected || !profile) return;
+		if (!chatInput.trim() && !chatImage) return;
+
 		const text = chatInput.trim();
+		const image = chatImage;
 		setChatInput("");
+		setChatImage(null);
 		const now = Date.now();
+
+		// Always save locally with image
 		setChatLogs((prev) => {
 			const updated = {
 				...prev,
 				[selected]: [
 					...(prev[selected] ?? []),
-					{ from: profile.username, text, time: now },
+					{ from: profile.username, text, image, time: now },
 				],
 			};
 			localStorage.setItem("gd_chats", JSON.stringify(updated));
 			return updated;
 		});
-		if (peers) {
+
+		// Broadcast text only (images are too large for p2p payload)
+		if (peers && text) {
 			const payload = JSON.stringify({
 				type: "INCIDENT_CHAT",
 				data: { incidentId: selected, text },
@@ -707,7 +723,18 @@ export function TacticalDashboard() {
 														color: "rgba(255,255,255,0.65)",
 													}}
 												>
-													{msg.text}
+													{msg.image && (
+														<img
+															alt=""
+															className="mb-2 max-w-full"
+															src={msg.image}
+															style={{
+																maxHeight: 200,
+																border: "1px solid rgba(255,255,255,0.06)",
+															}}
+														/>
+													)}
+													{msg.text && <span>{msg.text}</span>}
 												</div>
 											</div>
 										);
@@ -716,28 +743,70 @@ export function TacticalDashboard() {
 								</div>
 
 								<form
-									className="flex shrink-0 items-center gap-2 border-t border-white/6 p-3"
+									className="flex shrink-0 flex-col gap-2 border-t border-white/6 p-3"
 									onSubmit={handleSendChat}
 								>
-									<input
-										className="flex-1 bg-transparent px-3 py-2.5 text-[11px] text-white/70 outline-none placeholder:text-white/20 transition-colors focus:bg-white/3"
-										onChange={(e) => setChatInput(e.target.value)}
-										placeholder="Send a message..."
-										style={{ border: "1px solid rgba(255,255,255,0.07)" }}
-										value={chatInput}
-									/>
-									<button
-										className="px-4 py-2.5 text-[10px] tracking-widest transition-all disabled:opacity-25"
-										disabled={!chatInput.trim()}
-										style={{
-											border: "1px solid rgba(239,68,68,0.35)",
-											color: "#f87171",
-											background: "rgba(239,68,68,0.06)",
-										}}
-										type="submit"
-									>
-										SEND
-									</button>
+									{chatImage && (
+										<div className="relative w-fit">
+											<img
+												alt="attachment"
+												className="max-h-24 max-w-[200px] object-cover"
+												src={chatImage}
+												style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+											/>
+											<button
+												className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#0c0c0c] text-[9px] text-white/40 hover:text-white/70"
+												onClick={() => setChatImage(null)}
+												style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+												type="button"
+											>
+												✕
+											</button>
+										</div>
+									)}
+									<div className="flex items-center gap-2">
+										<button
+											className="shrink-0 px-2 py-2.5 text-[10px] text-white/20 transition-colors hover:text-white/50"
+											onClick={() => chatFileRef.current?.click()}
+											style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+											type="button"
+										>
+											＋
+										</button>
+										<input
+											accept="image/*"
+											className="hidden"
+											onChange={(e) => {
+												const file = e.target.files?.[0];
+												if (!file) return;
+												const reader = new FileReader();
+												reader.onload = () =>
+													setChatImage(reader.result as string);
+												reader.readAsDataURL(file);
+											}}
+											ref={chatFileRef}
+											type="file"
+										/>
+										<input
+											className="flex-1 bg-transparent px-3 py-2.5 text-[11px] text-white/70 outline-none placeholder:text-white/20 transition-colors focus:bg-white/3"
+											onChange={(e) => setChatInput(e.target.value)}
+											placeholder="Send a message..."
+											style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+											value={chatInput}
+										/>
+										<button
+											className="px-4 py-2.5 text-[10px] tracking-widest transition-all disabled:opacity-25"
+											disabled={!chatInput.trim() && !chatImage}
+											style={{
+												border: "1px solid rgba(239,68,68,0.35)",
+												color: "#f87171",
+												background: "rgba(239,68,68,0.06)",
+											}}
+											type="submit"
+										>
+											SEND
+										</button>
+									</div>
 								</form>
 							</div>
 						) : (
@@ -1142,13 +1211,6 @@ export function TacticalDashboard() {
 						</div>
 
 						<div className="mt-6 flex justify-end gap-3">
-							<button
-								className="px-4 py-2 text-[10px] tracking-widest text-white/20 transition-colors hover:text-white/45"
-								onClick={() => setShowOnboard(false)}
-								type="button"
-							>
-								SKIP
-							</button>
 							<button
 								className="px-5 py-2 text-[10px] tracking-widest transition-all disabled:opacity-25"
 								disabled={!hqDraft}
