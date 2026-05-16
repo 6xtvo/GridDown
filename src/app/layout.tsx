@@ -1,8 +1,8 @@
 import "@/styles/globals.css";
 
 import type { Metadata } from "next";
-// Import blocky and stylized fonts
-import { Bebas_Neue, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 
 import { TRPCReactProvider } from "@/trpc/react";
 
@@ -12,23 +12,22 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const bebas = Bebas_Neue({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-bebas",
+const sevenSegment = localFont({
+  src: "../../public/seven-segment.ttf",
+  variable: "--font-seven-custom", // Added -custom to avoid naming collisions
+  display: "swap",
 });
 
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-jetbrains",
+  variable: "--font-jetbrains-custom", // Added -custom
 });
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // Set background to black globally to avoid white flashes
-    <html className={`${bebas.variable} ${jetbrains.variable} bg-black`} lang="en">
+    <html className={`${sevenSegment.variable} ${jetbrains.variable} bg-black`} lang="en">
       <body className="font-jetbrains">
         <TRPCReactProvider>{children}</TRPCReactProvider>
       </body>
