@@ -27,6 +27,7 @@ class P2PNetwork {
 	private sendSignal: SignalSender | null = null;
 
 	private connections = new Map<string, RTCPeerConnection>();
+	private connectionRoles = new Map<string, boolean>();
 	private channels = new Map<string, RTCDataChannel>();
 	private pendingIce = new Map<string, RTCIceCandidateInit[]>();
 	private pendingMessages = new Map<string, P2PMessage[]>();
@@ -95,7 +96,14 @@ class P2PNetwork {
 		const pending = this.pendingMessages.get(peerId) ?? [];
 		pending.push(message);
 		this.pendingMessages.set(peerId, pending);
-		this.ensureConnection(peerId, this.peerId < peerId);
+
+		const existing = this.connections.get(peerId);
+		const existingRole = this.connectionRoles.get(peerId);
+		if (existing && existingRole === false) {
+			this.closeConnection(peerId);
+		}
+
+		this.ensureConnection(peerId, true);
 	}
 
 	broadcast(message: P2PMessage): void {
@@ -111,6 +119,7 @@ class P2PNetwork {
 		this.pendingIce.clear();
 		this.pendingMessages.clear();
 		this.knownPeers.clear();
+		this.connectionRoles.clear();
 	}
 
 	private ensureConnection(
@@ -125,6 +134,7 @@ class P2PNetwork {
 
 		const conn = new RTCPeerConnection({ iceServers: this.iceServers });
 		this.connections.set(peerId, conn);
+		this.connectionRoles.set(peerId, initiator);
 
 		conn.onicecandidate = (e) => {
 			if (!e.candidate || !this.sendSignal || !this.peerId) return;
@@ -258,6 +268,7 @@ class P2PNetwork {
 		this.channels.delete(peerId);
 		this.connections.get(peerId)?.close();
 		this.connections.delete(peerId);
+		this.connectionRoles.delete(peerId);
 		this.pendingMessages.delete(peerId);
 		this.pendingIce.delete(peerId);
 	}

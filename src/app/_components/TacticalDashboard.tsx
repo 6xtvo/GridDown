@@ -157,6 +157,12 @@ export function TacticalDashboard() {
 		message.msgId ??
 		`${room}:${message.time}:${message.from}:${message.text}:${index}`;
 
+	const normalizeChatThread = (room: string, messages: ChatMsg[]) =>
+		messages.map((message, index) => ({
+			...message,
+			msgId: getChatMessageId(room, message, index),
+		}));
+
 	const base = profile ?? DEFAULT_LOCATION;
 
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -181,13 +187,7 @@ export function TacticalDashboard() {
 		if (savedChat) {
 			const parsed = JSON.parse(savedChat) as Record<string, ChatMsg[]>;
 			const normalized = Object.fromEntries(
-				Object.entries(parsed).map(([room, messages]) => [
-					room,
-					messages.map((message, index) => ({
-						...message,
-						msgId: getChatMessageId(room, message, index),
-					})),
-				]),
+				Object.entries(parsed).map(([room, messages]) => [room, normalizeChatThread(room, messages)]),
 			) as Record<string, ChatMsg[]>;
 			setChatLogs(normalized);
 		}
@@ -263,10 +263,10 @@ export function TacticalDashboard() {
 						ChatMsg[]
 					>;
 					Object.entries(peerChats).forEach(([roomId, msgs]) => {
-						const room: ChatMsg[] = merged[roomId] ?? [];
+						const room: ChatMsg[] = normalizeChatThread(roomId, merged[roomId] ?? []);
+						const peerThread = normalizeChatThread(roomId, msgs);
 						const dedupedRoom = [...room];
-						msgs.forEach((msg) => {
-							// FIX: deduplicate by msgId instead of timestamp + from
+						peerThread.forEach((msg) => {
 							if (!dedupedRoom.some((x) => x.msgId === msg.msgId)) {
 								dedupedRoom.push(msg);
 								changed = true;
