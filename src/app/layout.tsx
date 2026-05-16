@@ -15,13 +15,13 @@ export const metadata: Metadata = {
 
 const sevenSegment = localFont({
 	src: "../../public/seven-segment.ttf",
-	variable: "--font-seven-custom", // Added -custom to avoid naming collisions
+	variable: "--font-seven-custom",
 	display: "swap",
 });
 
 const jetbrains = JetBrains_Mono({
 	subsets: ["latin"],
-	variable: "--font-jetbrains-custom", // Added -custom
+	variable: "--font-jetbrains-custom",
 });
 
 export default function RootLayout({
