@@ -215,7 +215,6 @@ export function TacticalDashboard() {
 						className="opacity-90"
 						height={32}
 						src="/icon.png"
-						src="/icon.png"
 						width={32}
 					/>
 					<div className="font-sans text-3xl text-red-600 tracking-widest">
