@@ -49,6 +49,14 @@ const DISCOVERY_GROUP =
 const RELAY_TOKEN = process.env.LAN_RELAY_TOKEN ?? "gdgc-lan-dev-token";
 const HEARTBEAT_INTERVAL_MS = Number(process.env.LAN_HEARTBEAT_INTERVAL_MS ?? 5000);
 const STALE_NODE_MS = Number(process.env.LAN_STALE_NODE_MS ?? 20000);
+const DISCOVERY_SEND_TIMEOUT_MS = Number(
+	process.env.LAN_DISCOVERY_SEND_TIMEOUT_MS ?? 1500,
+);
+
+interface IPv4Interface {
+	address: string;
+	netmask: string;
+}
 
 function normalizeUrl(url: string): string {
 	return url.replace(/\/+$/, "");
@@ -77,6 +85,42 @@ function firstPrivateIPv4(): string | null {
 		}
 	}
 	return null;
+}
+
+function getIPv4Interfaces(): IPv4Interface[] {
+	const out: IPv4Interface[] = [];
+	const nets = os.networkInterfaces();
+	for (const addresses of Object.values(nets)) {
+		for (const addr of addresses ?? []) {
+			if (addr.family !== "IPv4" || addr.internal || !addr.netmask) continue;
+			out.push({ address: addr.address, netmask: addr.netmask });
+		}
+	}
+	return out;
+}
+
+function ipToInt(ip: string): number {
+	const parts = ip.split(".").map((p) => Number(p));
+	if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) {
+		return 0;
+	}
+	return ((parts[0] ?? 0) << 24) | ((parts[1] ?? 0) << 16) | ((parts[2] ?? 0) << 8) | (parts[3] ?? 0);
+}
+
+function intToIp(n: number): string {
+	const b1 = (n >>> 24) & 255;
+	const b2 = (n >>> 16) & 255;
+	const b3 = (n >>> 8) & 255;
+	const b4 = n & 255;
+	return `${b1}.${b2}.${b3}.${b4}`;
+}
+
+function getBroadcastAddress(address: string, netmask: string): string | null {
+	const ip = ipToInt(address);
+	const mask = ipToInt(netmask);
+	if (!ip || !mask) return null;
+	const broadcast = (ip & mask) | (~mask >>> 0);
+	return intToIp(broadcast >>> 0);
 }
 
 function resolveBaseUrl(): string {
@@ -126,6 +170,7 @@ export class LanDiscovery {
 	private readonly relayUrls = resolveRelayUrls(this.baseUrl);
 	private readonly localPeers = new Map<string, PeerInfo>();
 	private readonly remoteNodes = new Map<string, RemoteNode>();
+	private readonly broadcastTargets = new Set<string>();
 	private socket: dgram.Socket | null = null;
 	private heartbeatTimer: NodeJS.Timeout | null = null;
 	private cleanupTimer: NodeJS.Timeout | null = null;
@@ -143,7 +188,16 @@ export class LanDiscovery {
 			this.socket.on("message", (msg) => this.onMessage(msg));
 			this.socket.bind(DISCOVERY_PORT, () => {
 				if (!this.socket) return;
-				this.socket.addMembership(DISCOVERY_GROUP);
+				for (const iface of getIPv4Interfaces()) {
+					try {
+						this.socket.addMembership(DISCOVERY_GROUP, iface.address);
+					} catch {
+						// Ignore interfaces that do not support multicast.
+					}
+					const broadcast = getBroadcastAddress(iface.address, iface.netmask);
+					if (broadcast) this.broadcastTargets.add(broadcast);
+				}
+				this.broadcastTargets.add("255.255.255.255");
 				this.socket.setBroadcast(true);
 				this.socket.setMulticastTTL(64);
 				this.sendHeartbeat();
@@ -258,7 +312,7 @@ export class LanDiscovery {
 					method: "POST",
 					headers: { "content-type": "application/json" },
 					body: JSON.stringify(payload),
-					signal: AbortSignal.timeout(3000),
+					signal: AbortSignal.timeout(DISCOVERY_SEND_TIMEOUT_MS),
 				});
 				if (res.ok) return;
 				lastError = new Error(`Relay request failed: ${res.status}`);
@@ -322,6 +376,9 @@ export class LanDiscovery {
 		};
 		const data = Buffer.from(JSON.stringify(payload));
 		this.socket.send(data, DISCOVERY_PORT, DISCOVERY_GROUP);
+		for (const target of this.broadcastTargets) {
+			this.socket.send(data, DISCOVERY_PORT, target);
+		}
 	}
 
 	private cleanupStaleNodes(): void {
