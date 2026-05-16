@@ -1,7 +1,8 @@
-import { UrgencyBoard } from "@/app/_components/UrgencyBoard"; // Adjust path if needed
+import { UrgencyBoard } from "@/app/_components/UrgencyBoard";
 import { signIn } from "@/server/auth";
 import { HydrateClient } from "@/trpc/server";
 
+// Optional: Keep the sign-in button if you still want auth access
 export function SignInButton() {
 	return (
 		<form
@@ -23,7 +24,7 @@ export function SignInButton() {
 export default async function Home() {
 	return (
 		<HydrateClient>
-			<main className="flex min-h-screen flex-col items-center bg-black text-white">
+			<main className="flex min-h-screen flex-col bg-black text-white">
 				{/* --- TACTICAL NAV --- */}
 				<nav className="flex w-full items-center justify-between border-red-600 border-b-2 bg-black px-8 py-4">
 					<div className="font-seven text-6xl text-red-600 tracking-widest">
@@ -33,28 +34,9 @@ export default async function Home() {
 				</nav>
 
 				{/* --- MAIN INTERFACE --- */}
-				<div className="container flex flex-col gap-8 px-4 py-8">
-					{/* Header Stats */}
-					<div className="flex justify-between border-red-600 border-l-4 bg-red-900/10 p-4 font-seven text-red-500 text-xl tracking-wider">
-						<div>{"SIGNAL: WEAK // ENCRYPTION: ACTIVE"}</div>
-						<div>{"IDENTIFYING..."}</div>
-					</div>
-
-					{/* --- IMPORTED URGENCY BOARD --- */}
+				{/* The p-4 and flex-1 allow the UrgencyBoard to expand naturally */}
+				<div className="flex-1 w-full max-w-[1800px] mx-auto p-4 md:p-8 flex flex-col">
 					<UrgencyBoard />
-
-					{/* Footer Info */}
-					<div className="grid grid-cols-1 gap-4 font-seven text-lg text-zinc-600 uppercase tracking-widest md:grid-cols-3">
-						<div className="border-zinc-800 border-t pt-2">
-							System: v2.0.4-Stable
-						</div>
-						<div className="border-zinc-800 border-t pt-2 text-center">
-							Connection: Encrypted_P2P
-						</div>
-						<div className="border-zinc-800 border-t pt-2 text-right">
-							No unauthorized access
-						</div>
-					</div>
 				</div>
 			</main>
 		</HydrateClient>
