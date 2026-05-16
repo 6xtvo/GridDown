@@ -187,7 +187,10 @@ export function TacticalDashboard() {
 		if (savedChat) {
 			const parsed = JSON.parse(savedChat) as Record<string, ChatMsg[]>;
 			const normalized = Object.fromEntries(
-				Object.entries(parsed).map(([room, messages]) => [room, normalizeChatThread(room, messages)]),
+				Object.entries(parsed).map(([room, messages]) => [
+					room,
+					normalizeChatThread(room, messages),
+				]),
 			) as Record<string, ChatMsg[]>;
 			setChatLogs(normalized);
 		}
@@ -263,7 +266,10 @@ export function TacticalDashboard() {
 						ChatMsg[]
 					>;
 					Object.entries(peerChats).forEach(([roomId, msgs]) => {
-						const room: ChatMsg[] = normalizeChatThread(roomId, merged[roomId] ?? []);
+						const room: ChatMsg[] = normalizeChatThread(
+							roomId,
+							merged[roomId] ?? [],
+						);
 						const peerThread = normalizeChatThread(roomId, msgs);
 						const dedupedRoom = [...room];
 						peerThread.forEach((msg) => {
