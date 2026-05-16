@@ -1,28 +1,15 @@
 "use client";
 
-import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
+import { useState } from "react";
+// Import MapLibre wrapper and the required CSS
+import Map, { Marker } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 // Mock data for London incidents
 const INCIDENTS = [
   { id: 1, priority: "HIGH", time: "14:02:01", msg: "Supply drop identified. Awaiting retrieval.", lat: 51.5054, lng: -0.0235, loc: "Canary Wharf" },
   { id: 2, priority: "MED", time: "14:00:45", msg: "Civil unrest reported. Avoid primary arterial roads.", lat: 51.5136, lng: -0.1365, loc: "Soho" },
   { id: 3, priority: "HIGH", time: "13:58:12", msg: "Comms tower offline. Investigating sabotage.", lat: 51.5045, lng: -0.0865, loc: "The Shard" }
-];
-
-// Tactical Red/Black Google Maps Style
-const tacticalMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#000000" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#000000" }, { weight: 2 }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#ef4444" }] },
-  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#ef4444" }, { weight: 1 }] },
-  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#050505" }] },
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#000000" }] },
-  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#ef4444" }, { weight: 1 }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#000000" }] },
-  { featureType: "water", elementType: "geometry.stroke", stylers: [{ color: "#ef4444" }, { weight: 2 }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ visibility: "off" }] }
 ];
 
 export function UrgencyBoard() {
@@ -45,7 +32,6 @@ export function UrgencyBoard() {
           <div className="p-4 space-y-4">
             {INCIDENTS.map((inc) => (
               <div key={inc.id} className="border border-zinc-800 bg-zinc-900 p-3 relative overflow-hidden group hover:border-red-600/50 transition-colors">
-                {/* Subtle red left-border accent for high priority */}
                 {inc.priority === "HIGH" && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-600"></div>}
                 
                 <div className="flex justify-between font-seven text-red-600 text-xl tracking-wider">
@@ -74,30 +60,37 @@ export function UrgencyBoard() {
 
         {/* RIGHT: Tactical Map */}
         <div className="relative flex-1 bg-black overflow-hidden">
-          {/* API Provider requires an API key, but will render a darkened "development only" map if empty, which is fine for testing */}
-          <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}>
-            <Map
-              defaultCenter={{ lat: 51.5074, lng: -0.1278 }} // London
-              defaultZoom={13}
-              disableDefaultUI={true}
-              styles={tacticalMapStyle}
-              mapId="griddown-tactical-map"
-            >
-              {INCIDENTS.map((inc) => (
-                <Marker 
-                  key={inc.id} 
-                  position={{ lat: inc.lat, lng: inc.lng }} 
-                  icon={{
-                    path: "M-10,0 L10,0 M0,-10 L0,10", // Tactical Crosshair
-                    strokeColor: "#ef4444",
-                    strokeWeight: 2,
-                  }}
-                />
-              ))}
-            </Map>
-          </APIProvider>
+          
+          <Map
+            initialViewState={{
+              longitude: -0.1278,
+              latitude: 51.5074,
+              zoom: 11.5,
+              pitch: 45, // Adds a slight 3D tilt for a tactical radar look
+            }}
+            // Carto's free Dark Matter map style - no API key required!
+            mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            attributionControl={false} // Hides the default map attribution for a cleaner HUD
+          >
+            {INCIDENTS.map((inc) => (
+              <Marker 
+                key={inc.id} 
+                longitude={inc.lng} 
+                latitude={inc.lat} 
+                anchor="center"
+              >
+                {/* Custom HTML Tactical Marker */}
+                <div className="relative flex items-center justify-center w-8 h-8">
+                  {/* Radar pulse effect */}
+                  <span className="absolute inline-flex w-full h-full rounded-full bg-red-600 opacity-30 animate-ping"></span>
+                  {/* Crosshair core */}
+                  <div className="relative z-10 w-3 h-3 bg-red-600 border border-black transform rotate-45"></div>
+                </div>
+              </Marker>
+            ))}
+          </Map>
 
-          {/* Map Overlay HUD */}
+          {/* Map Overlay HUD (Coordinates) */}
           <div className="absolute bottom-4 right-4 bg-black/80 border border-red-600 p-2 font-seven text-lg tracking-wider text-red-500 pointer-events-none">
             LAT: 51.5074<br/>
             LON: -0.1278<br/>
@@ -109,6 +102,9 @@ export function UrgencyBoard() {
             SAT_UPLINK: SECURE<br/>
             MARKERS: {INCIDENTS.length}
           </div>
+          
+          {/* Scanline Overlay Effect */}
+          <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] opacity-40"></div>
         </div>
       </div>
     </div>

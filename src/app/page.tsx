@@ -1,6 +1,6 @@
 import { signIn } from "@/server/auth";
 import { HydrateClient, api } from "@/trpc/server";
-import { UrgencyBoard } from "@/components/UrgencyBoard"; // Adjust path if needed
+import { UrgencyBoard } from "@/app/_components/UrgencyBoard"; // Adjust path if needed
 
 export function SignInButton() {
   return (
