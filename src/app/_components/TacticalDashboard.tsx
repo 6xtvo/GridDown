@@ -494,7 +494,7 @@ export function TacticalDashboard() {
 						</span>
 						<div className="flex items-center gap-1.5">
 							<span className="gd-live h-1.5 w-1.5 rounded-full bg-red-500" />
-							<span className="text-[10px] tracking-[0.2em] text-white/25">
+							<span className="text-[10px] tracking-[0.2em] text-white/40">
 								{feed.length} {feed.length === 1 ? "TASK" : "TASKS"}
 							</span>
 						</div>
@@ -506,12 +506,12 @@ export function TacticalDashboard() {
 								className="gd-live h-1.5 w-1.5 rounded-full bg-green-400"
 								style={{ boxShadow: "0 0 4px rgba(74,222,128,0.5)" }}
 							/>
-							<span className="text-[10px] tracking-[0.2em] text-white/25">
+							<span className="text-[10px] tracking-[0.2em] text-white/40">
 								{(peers?.length ?? 0) + (profile ? 1 : 0)} ONLINE
 							</span>
 						</div>
 						<div className="h-3 w-px bg-white/8" />
-						<span className="text-[10px] tracking-[0.2em] text-white/25">
+						<span className="text-[10px] tracking-[0.2em] text-white/40">
 							{
 								feed.filter(
 									(i) => i.type === "REQUEST" && i.priority === "HIGH",
@@ -523,13 +523,13 @@ export function TacticalDashboard() {
 					<div className="flex items-center gap-5">
 						{profile ? (
 							<>
-								<span className="text-[11px] text-white/35">
+								<span className="text-[11px] text-white/50">
 									<span className="text-white/60">{profile.username}</span>
 									{" · "}
 									{profile.role}
 								</span>
 								<button
-									className="text-[10px] tracking-widest text-white/20 transition-colors hover:text-red-500"
+									className="text-[10px] tracking-widest text-white/35 transition-colors hover:text-red-500"
 									onClick={() => {
 										localStorage.removeItem("gd_profile");
 										window.location.reload();
@@ -562,7 +562,7 @@ export function TacticalDashboard() {
 										onChange={(e) => setPostMsg(e.target.value)}
 										placeholder="Describe the situation..."
 										rows={2}
-										style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+										style={{ border: "1px solid rgba(255,255,255,0.2)" }}
 										value={postMsg}
 									/>
 									<div className="flex flex-col gap-1.5">
@@ -573,11 +573,11 @@ export function TacticalDashboard() {
 													key={t}
 													onClick={() => setPostType(t)}
 													style={{
-														border: `1px solid ${postType === t ? TYPE_COLOR[t] + "55" : "rgba(255,255,255,0.07)"}`,
+														border: `1px solid ${postType === t ? TYPE_COLOR[t] + "55" : "rgba(255,255,255,0.2)"}`,
 														color:
 															postType === t
 																? TYPE_COLOR[t]
-																: "rgba(255,255,255,0.25)",
+																: "rgba(255,255,255,0.75)",
 														background:
 															postType === t
 																? TYPE_COLOR[t] + "0f"
@@ -608,11 +608,11 @@ export function TacticalDashboard() {
 														key={p}
 														onClick={() => setPostPriority(p)}
 														style={{
-															border: `1px solid ${postPriority === p ? PRIORITY_DOT[p] + "55" : "rgba(255,255,255,0.07)"}`,
+															border: `1px solid ${postPriority === p ? PRIORITY_DOT[p] + "55" : "rgba(255,255,255,0.2)"}`,
 															color:
 																postPriority === p
 																	? PRIORITY_DOT[p]
-																	: "rgba(255,255,255,0.2)",
+																	: "rgba(255,255,255,0.75)",
 															background:
 																postPriority === p
 																	? PRIORITY_DOT[p] + "0f"
@@ -691,19 +691,20 @@ export function TacticalDashboard() {
 													>
 														{TYPE_LABEL[inc.type]}
 													</span>
-													<span className="truncate text-[11px] leading-relaxed text-white/55">
+													<span className="truncate text-[11px] leading-relaxed text-white/70">
 														{inc.msg}
 													</span>
 												</div>
 												<div className="flex items-center gap-3">
-													<span className="text-[9px] text-white/20">
+													<span className="text-[9px] text-white/40">
 														{inc.author}
 													</span>
-													<span className="text-[9px] text-white/15">
+													<span className="text-[9px] text-white/35">
 														{inc.time}
 													</span>
-													<span className="ml-auto text-[9px] text-white/20">
-														{haversine(base.lat, base.lng, inc.lat, inc.lng)}km
+													<span className="ml-auto text-[9px] text-white/40">
+														{haversine(base.lat, base.lng, inc.lat, inc.lng)}
+														km
 													</span>
 												</div>
 											</div>
@@ -724,13 +725,13 @@ export function TacticalDashboard() {
 												)}
 												<div className="ml-auto flex gap-2">
 													<button
-														className="px-2.5 py-1 text-[9px] tracking-widest text-white/30 transition-colors hover:text-white/60"
+														className="px-2.5 py-1 text-[9px] tracking-widest text-white/50 transition-colors hover:text-white/60"
 														onClick={(e) => {
 															e.stopPropagation();
 															openChat(inc.id);
 														}}
 														style={{
-															border: "1px solid rgba(255,255,255,0.07)",
+															border: "1px solid rgba(255,255,255,0.2)",
 														}}
 													>
 														CHAT
@@ -777,14 +778,14 @@ export function TacticalDashboard() {
 												{selectedInc.msg}
 											</span>
 										</div>
-										<p className="mt-0.5 text-[9px] text-white/25">
+										<p className="mt-0.5 text-[9px] text-white/40">
 											{selectedInc.loc} · {selectedInc.author}
 										</p>
 									</div>
 									<button
-										className="px-3 py-1.5 text-[10px] tracking-widest text-white/25 transition-colors hover:text-white/55"
+										className="px-3 py-1.5 text-[10px] tracking-widest text-white/50  transition-colors hover:text-white/55"
 										onClick={() => setRightPanel("map")}
-										style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+										style={{ border: "1px solid rgba(255,255,255,0.2)" }}
 									>
 										← MAP
 									</button>
@@ -793,7 +794,7 @@ export function TacticalDashboard() {
 								<div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
 									{activeChat.length === 0 && (
 										<div className="flex h-24 items-center justify-center">
-											<span className="text-[10px] tracking-[0.25em] text-white/15">
+											<span className="text-[10px] tracking-[0.25em] text-white/50">
 												NO MESSAGES YET
 											</span>
 										</div>
@@ -815,7 +816,7 @@ export function TacticalDashboard() {
 															? "rgba(255,255,255,0.04)"
 															: "rgba(239,68,68,0.06)",
 														border: isMe
-															? "1px solid rgba(255,255,255,0.07)"
+															? "1px solid rgba(255,255,255,0.2)"
 															: "1px solid rgba(239,68,68,0.15)",
 														color: "rgba(255,255,255,0.65)",
 													}}
@@ -865,7 +866,7 @@ export function TacticalDashboard() {
 										<button
 											className="shrink-0 px-2 py-2.5 text-[10px] text-white/20 transition-colors hover:text-white/50"
 											onClick={() => chatFileRef.current?.click()}
-											style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+											style={{ border: "1px solid rgba(255,255,255,0.2)" }}
 											type="button"
 										>
 											＋
@@ -888,7 +889,7 @@ export function TacticalDashboard() {
 											className="flex-1 bg-transparent px-3 py-2.5 text-[11px] text-white/70 outline-none placeholder:text-white/20 transition-colors focus:bg-white/3"
 											onChange={(e) => setChatInput(e.target.value)}
 											placeholder="Send a message..."
-											style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+											style={{ border: "1px solid rgba(255,255,255,0.2)" }}
 											value={chatInput}
 										/>
 										<button
@@ -1017,7 +1018,7 @@ export function TacticalDashboard() {
 										className="gd-in absolute bottom-4 left-4 right-4 px-4 py-3.5"
 										style={{
 											background: "rgba(12,12,12,0.94)",
-											border: "1px solid rgba(255,255,255,0.07)",
+											border: "1px solid rgba(255,255,255,0.2)",
 											backdropFilter: "blur(10px)",
 										}}
 									>
@@ -1064,7 +1065,7 @@ export function TacticalDashboard() {
 													✕
 												</button>
 												<button
-													className="px-2.5 py-1 text-[9px] tracking-widest text-white/30 transition-colors hover:text-white/60"
+													className="px-2.5 py-1 text-[9px] tracking-widest text-white/50 transition-colors hover:text-white/60"
 													onClick={() => openChat(selectedInc.id)}
 													style={{ border: "1px solid rgba(255,255,255,0.08)" }}
 												>
@@ -1113,7 +1114,7 @@ export function TacticalDashboard() {
 						<h2 className="mb-1 text-sm tracking-[0.25em] text-white/60">
 							OPERATOR PROFILE
 						</h2>
-						<p className="mb-6 text-[10px] text-white/25">
+						<p className="mb-6 text-[10px] text-white/40">
 							Set your name to join the mesh.
 						</p>
 
@@ -1121,7 +1122,7 @@ export function TacticalDashboard() {
 							{/* ── Callsign ── */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
-									<span className="text-[9px] tracking-[0.25em] text-white/30">
+									<span className="text-[9px] tracking-[0.25em] text-white/50">
 										CALLSIGN
 									</span>
 									{obErrors.username && (
@@ -1138,7 +1139,7 @@ export function TacticalDashboard() {
 									}}
 									placeholder="e.g. DELTA-7"
 									style={{
-										border: `1px solid ${obErrors.username ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.07)"}`,
+										border: `1px solid ${obErrors.username ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.2)"}`,
 									}}
 									value={obUsername}
 								/>
@@ -1147,7 +1148,7 @@ export function TacticalDashboard() {
 							{/* ── Age ── */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
-									<span className="text-[9px] tracking-[0.25em] text-white/30">
+									<span className="text-[9px] tracking-[0.25em] text-white/50">
 										AGE
 									</span>
 									{obErrors.age && (
@@ -1166,7 +1167,7 @@ export function TacticalDashboard() {
 									}}
 									placeholder="e.g. 34"
 									style={{
-										border: `1px solid ${obErrors.age ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.07)"}`,
+										border: `1px solid ${obErrors.age ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.2)"}`,
 									}}
 									type="number"
 									value={obAge}
@@ -1176,7 +1177,7 @@ export function TacticalDashboard() {
 							{/* ── Skills pill selector ── */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
-									<span className="text-[9px] tracking-[0.25em] text-white/30">
+									<span className="text-[9px] tracking-[0.25em] text-white/50">
 										SKILLS
 									</span>
 									{obErrors.skills && (
@@ -1242,7 +1243,7 @@ export function TacticalDashboard() {
 												setObErrors((prev) => ({ ...prev, skills: undefined }));
 											}}
 											style={{
-												border: "1px solid rgba(255,255,255,0.07)",
+												border: "1px solid rgba(255,255,255,0.2)",
 												color: "rgba(255,255,255,0.25)",
 											}}
 											type="button"
@@ -1255,14 +1256,14 @@ export function TacticalDashboard() {
 
 							{/* ── HQ map ── */}
 							<div>
-								<label className="mb-1.5 block text-[9px] tracking-[0.25em] text-white/30">
+								<label className="mb-1.5 block text-[9px] tracking-[0.25em] text-white/50">
 									LOCATION <span className="text-white/15">(click map)</span>
 								</label>
 								<div
 									className="relative overflow-hidden"
 									style={{
 										height: 150,
-										border: "1px solid rgba(255,255,255,0.07)",
+										border: "1px solid rgba(255,255,255,0.2)",
 									}}
 								>
 									<MapGL
@@ -1293,7 +1294,7 @@ export function TacticalDashboard() {
 									</MapGL>
 									{!hqDraft && (
 										<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
-											<span className="text-[10px] tracking-[0.3em] text-white/25">
+											<span className="text-[10px] tracking-[0.3em] text-white/50">
 												CLICK TO SET
 											</span>
 										</div>
