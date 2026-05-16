@@ -1,4 +1,5 @@
-import { TacticalDashboard } from "@/app/_components/TacticalDashboard"; // Adjust your path if it's in _components
+import { TacticalDashboard } from "@/app/_components/TacticalDashboard"; 
+import { QuickGuide } from "@/app/_components/QuickGuide"; // <-- Import it here
 import { HydrateClient } from "@/trpc/server";
 
 export default async function Home() {
@@ -6,12 +7,10 @@ export default async function Home() {
 		<HydrateClient>
 			<main className="flex min-h-screen flex-col items-center bg-black text-white">
 				<div className="w-full">
-					{/* All Nav, Profile, Modals, and the Map are handled here now */}
 					<TacticalDashboard />
 				</div>
 
 				<div className="container flex flex-col gap-4 px-4 py-8">
-					{/* Background Server Connection Stats */}
 					<div className="flex justify-between border-red-600 border-l-4 bg-red-900/10 p-4 font-seven text-red-500 text-xl tracking-wider">
 						<div>{"SIGNAL: WEAK // ENCRYPTION: ACTIVE"}</div>
 					</div>
@@ -24,10 +23,13 @@ export default async function Home() {
 							Connection: Local_Node
 						</div>
 						<div className="border-zinc-800 border-t pt-2 text-right">
-							No unauthorized access
+							Uplink: STABLE
 						</div>
 					</div>
 				</div>
+
+				{/* Add the guide component at the very end of your main container */}
+				<QuickGuide />
 			</main>
 		</HydrateClient>
 	);

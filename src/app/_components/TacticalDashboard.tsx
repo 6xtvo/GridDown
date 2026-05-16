@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import MapGL, { Layer, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { UrgencyBoard } from "./UrgencyBoard"; // <-- P2P Board
-import { api } from "@/trpc/react"; // <-- Added TRPC API
+import { UrgencyBoard } from "./UrgencyBoard"; 
+import { api } from "@/trpc/react"; 
+import Image from "next/image";
 
-// Base Location
-const BASE_LOCATION = { lat: 51.5007, lng: -0.1246 };
+// Fallback Default Location (Center of London)
+const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
 
 // Helper Formulas
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -50,6 +51,8 @@ export function TacticalDashboard() {
 		username: string;
 		profession: string;
 		age: string;
+		lat: number; // <-- Added lat
+		lng: number; // <-- Added lng
 	} | null>(null);
 	
 	const [localIncidents, setLocalIncidents] = useState<Incident[]>([]);
@@ -57,11 +60,19 @@ export function TacticalDashboard() {
 	// UI State
 	const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 	const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+	
+	// New state to hold HQ coordinates during profile creation
+	const [hqSelect, setHqSelect] = useState<{lat: number, lng: number} | null>(null);
+
 	const [hoveredId, setHoveredId] = useState<number | string | null>(null);
 	const [selectedIncidentId, setSelectedIncidentId] = useState<number | string | null>(null);
 	const [activeRoute, setActiveRoute] = useState<RouteState | null>(null);
 	const [isRouting, setIsRouting] = useState(false);
 	const [now, setNow] = useState<Date | null>(null);
+
+	const currentBase = profile?.lat && profile?.lng 
+    ? { lat: profile.lat, lng: profile.lng } 
+    : DEFAULT_LOCATION;
 
 	// --- P2P Network Hook ---
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -93,7 +104,7 @@ export function TacticalDashboard() {
 				if (!activeFeed.some((existing) => String(existing.id) === String(inc.id))) {
 					activeFeed.push({
 						id: inc.id,
-						type: inc.type || "REQUEST", // Fallback for older incidents
+						type: inc.type || "REQUEST", 
 						priority: inc.priority,
 						time: inc.time,
 						msg: inc.msg,
@@ -123,11 +134,19 @@ export function TacticalDashboard() {
 	// Form Handlers
 	const handleCreateProfile = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+		
+		if (!hqSelect) {
+			alert("SYS_ERROR: MUST SET HQ COORDINATES ON MAP");
+			return;
+		}
+
 		const formData = new FormData(e.currentTarget);
 		const newProfile = {
 			username: formData.get("username") as string,
 			profession: formData.get("profession") as string,
 			age: formData.get("age") as string,
+			lat: hqSelect.lat,
+			lng: hqSelect.lng,
 		};
 		setProfile(newProfile);
 		localStorage.setItem("griddown_profile", JSON.stringify(newProfile));
@@ -138,8 +157,9 @@ export function TacticalDashboard() {
 		setSelectedIncidentId(incident.id);
 		setIsRouting(true);
 		try {
+			// Using dynamic currentBase instead of hardcoded BASE_LOCATION
 			const res = await fetch(
-				`https://router.project-osrm.org/route/v1/driving/${BASE_LOCATION.lng},${BASE_LOCATION.lat};${incident.lng},${incident.lat}?overview=full&geometries=geojson`,
+				`https://router.project-osrm.org/route/v1/driving/${currentBase.lng},${currentBase.lat};${incident.lng},${incident.lat}?overview=full&geometries=geojson`,
 			);
 			const data = await res.json();
 			if (data.routes?.[0]) {
@@ -181,8 +201,17 @@ export function TacticalDashboard() {
 		<div className="flex w-full flex-col gap-8">
 			{/* --- TACTICAL NAV --- */}
 			<nav className="flex w-full items-center justify-between border-b-2 border-red-600 bg-black px-8 py-4">
-				<div className="font-sans text-3xl tracking-widest text-red-600">
-					GRID<span className="text-white">DOWN</span>
+				<div className="flex items-center gap-4">
+					<Image
+						src="/icon.png"
+						alt="GridDown Logo"
+						width={32}
+						height={32}
+						className="opacity-90"
+					/>
+					<div className="font-sans text-3xl tracking-widest text-red-600">
+						GRID<span className="text-white">DOWN</span>
+					</div>
 				</div>
 
 				{!profile ? (
@@ -228,44 +257,87 @@ export function TacticalDashboard() {
 			{isProfileModalOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
 					<form
-						className="w-full max-w-md border-2 border-red-600 bg-zinc-950 p-6 shadow-[0_0_30px_rgba(220,38,38,0.3)]"
+						className="w-full max-w-xl border-2 border-red-600 bg-zinc-950 p-6 shadow-[0_0_30px_rgba(220,38,38,0.3)]"
 						onSubmit={handleCreateProfile}
 					>
 						<h2 className="mb-6 font-seven text-3xl tracking-wider text-red-500">
 							INITIALIZE OPERATOR
 						</h2>
-						<div className="space-y-4 font-jetbrains">
-							<div>
-								<label className="text-xs text-red-500/70">
-									{"CALLSIGN / USERNAME"}
-								</label>
-								<input
-									className="w-full border border-red-900 bg-black p-2 uppercase text-white focus:border-red-500 focus:outline-none"
-									name="username"
-									required
-								/>
+						
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-jetbrains">
+							{/* Form Inputs */}
+							<div className="space-y-4">
+								<div>
+									<label className="text-xs text-red-500/70">
+										{"CALLSIGN / USERNAME"}
+									</label>
+									<input
+										className="w-full border border-red-900 bg-black p-2 uppercase text-white focus:border-red-500 focus:outline-none"
+										name="username"
+										required
+									/>
+								</div>
+								<div>
+									<label className="text-xs text-red-500/70">
+										PROFESSION / SKILLSET
+									</label>
+									<input
+										className="w-full border border-red-900 bg-black p-2 uppercase text-white focus:border-red-500 focus:outline-none"
+										name="profession"
+										placeholder="e.g. Medic, Engineer, Scout"
+										required
+									/>
+								</div>
+								<div>
+									<label className="text-xs text-red-500/70">AGE</label>
+									<input
+										className="w-full border border-red-900 bg-black p-2 text-white focus:border-red-500 focus:outline-none"
+										name="age"
+										required
+										type="number"
+									/>
+								</div>
 							</div>
-							<div>
-								<label className="text-xs text-red-500/70">
-									PROFESSION / SKILLSET
+
+							{/* HQ Map Selector */}
+							<div className="flex flex-col">
+								<label className="text-xs text-red-500/70 mb-1">
+									SET HQ COORDINATES (CLICK MAP)
 								</label>
-								<input
-									className="w-full border border-red-900 bg-black p-2 uppercase text-white focus:border-red-500 focus:outline-none"
-									name="profession"
-									placeholder="e.g. Medic, Engineer, Scout"
-									required
-								/>
-							</div>
-							<div>
-								<label className="text-xs text-red-500/70">AGE CYCLE</label>
-								<input
-									className="w-full border border-red-900 bg-black p-2 text-white focus:border-red-500 focus:outline-none"
-									name="age"
-									required
-									type="number"
-								/>
+								<div className="relative flex-1 min-h-[160px] border border-red-900 bg-black">
+									<MapGL
+										initialViewState={{
+											longitude: DEFAULT_LOCATION.lng,
+											latitude: DEFAULT_LOCATION.lat,
+											zoom: 10,
+										}}
+										mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+										onClick={(e) => setHqSelect({ lat: e.lngLat.lat, lng: e.lngLat.lng })}
+										attributionControl={false}
+									>
+										{hqSelect && (
+											<Marker latitude={hqSelect.lat} longitude={hqSelect.lng}>
+												<div className="relative flex h-4 w-4 items-center justify-center">
+													<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-40" />
+													<div className="relative z-10 h-2 w-2 rounded-full border border-black bg-green-500" />
+												</div>
+											</Marker>
+										)}
+									</MapGL>
+									{!hqSelect && (
+										<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 font-seven text-xs tracking-widest text-red-500/80">
+											AWAITING INPUT...
+										</div>
+									)}
+								</div>
+								{hqSelect && (
+									<div className="mt-1 font-seven text-[10px] text-green-500 tracking-widest">
+										LOCKED: [{hqSelect.lat.toFixed(4)}, {hqSelect.lng.toFixed(4)}]
+									</div>
+								)}
 							</div>
 						</div>
+
 						<div className="mt-8 flex justify-end gap-4">
 							<button
 								className="px-4 py-2 font-seven text-zinc-500 hover:text-white"
@@ -275,8 +347,13 @@ export function TacticalDashboard() {
 								CANCEL
 							</button>
 							<button
-								className="border border-red-600 bg-red-600/20 px-6 py-2 font-seven tracking-widest text-red-500 hover:bg-red-600 hover:text-black"
+								className={`border px-6 py-2 font-seven tracking-widest transition-colors ${
+									hqSelect 
+										? "border-red-600 bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-black" 
+										: "border-red-900 bg-black text-red-900 cursor-not-allowed"
+								}`}
 								type="submit"
+								disabled={!hqSelect}
 							>
 								AUTHENTICATE
 							</button>
@@ -389,8 +466,8 @@ export function TacticalDashboard() {
 						<MapGL
 							attributionControl={false}
 							initialViewState={{
-								longitude: -0.1278,
-								latitude: 51.5074,
+								longitude: currentBase.lng,
+								latitude: currentBase.lat,
 								zoom: 11.5,
 								pitch: 45,
 							}}
@@ -417,8 +494,8 @@ export function TacticalDashboard() {
 
 							<Marker
 								anchor="center"
-								latitude={BASE_LOCATION.lat}
-								longitude={BASE_LOCATION.lng}
+								latitude={currentBase.lat}
+								longitude={currentBase.lng}
 							>
 								<div className="relative flex h-6 w-6 items-center justify-center">
 									<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-40" />
@@ -458,8 +535,8 @@ export function TacticalDashboard() {
 													<div className="mb-1 border-red-600/30 border-b pb-1 font-seven text-red-500 text-sm">
 														DIST:{" "}
 														{getDistance(
-															BASE_LOCATION.lat,
-															BASE_LOCATION.lng,
+															currentBase.lat,
+															currentBase.lng,
 															inc.lat,
 															inc.lng,
 														)}{" "}
