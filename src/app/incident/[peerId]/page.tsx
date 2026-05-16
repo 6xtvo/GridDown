@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/trpc/react";
 
 interface DirectMessage {
+	id: string;
 	from: string;
 	text: string;
 	time: number;
@@ -18,8 +19,9 @@ export default function IncidentChatPage() {
 	const [isMounted, setIsMounted] = useState(false);
 	const [myPeerId, setMyPeerId] = useState("CONNECTING...");
 	const [input, setInput] = useState("");
-	const [messages, setMessages] = useState<DirectMessage[]>([]);
+	const [messageStore, setMessageStore] = useState<Record<string, DirectMessage[]>>({});
 	const bottomRef = useRef<HTMLDivElement>(null);
+	const messages = messageStore[targetPeerId] ?? [];
 
 	const register = api.p2p.register.useMutation();
 	const sendMessage = api.p2p.sendMessage.useMutation();
@@ -51,6 +53,11 @@ export default function IncidentChatPage() {
 			sessionStorage.setItem("operator_id", newId);
 			setMyPeerId(newId);
 		}
+
+		const savedChats = localStorage.getItem("gd_direct_chats");
+		if (savedChats) {
+			setMessageStore(JSON.parse(savedChats) as Record<string, DirectMessage[]>);
+		}
 	}, []);
 
 	// Keep registration alive
@@ -62,20 +69,35 @@ export default function IncidentChatPage() {
 
 	// Dequeue messages and append
 	useEffect(() => {
-		if (incomingMessages && incomingMessages.length > 0) {
-			// Filter to only messages from the person we are talking to
-			const relevantMessages = incomingMessages
-				.filter((m) => m.from === targetPeerId)
-				.map((m) => ({
-					from: m.from,
-					text: String(m.data),
-					time: m.timestamp,
-				}));
+		if (!incomingMessages?.length) return;
 
-			if (relevantMessages.length > 0) {
-				setMessages((prev) => [...prev, ...relevantMessages]);
+		setMessageStore((prev) => {
+			const updated = { ...prev };
+			let changed = false;
+
+			for (const message of incomingMessages) {
+				const room = message.from;
+				const text = String(message.data);
+				const id = message.id ?? `${room}:${message.timestamp}:${text}`;
+				const thread = updated[room] ?? [];
+				if (thread.some((existing) => existing.id === id)) continue;
+
+				thread.push({
+					id,
+					from: message.from,
+					text,
+					time: message.timestamp,
+				});
+				updated[room] = thread;
+				changed = true;
 			}
-		}
+
+			if (changed) {
+				localStorage.setItem("gd_direct_chats", JSON.stringify(updated));
+				return updated;
+			}
+			return prev;
+		});
 	}, [incomingMessages, targetPeerId]);
 
 	useEffect(() => {
@@ -88,12 +110,21 @@ export default function IncidentChatPage() {
 
 		const textToSend = input.trim();
 		setInput("");
+		const id = crypto.randomUUID();
 
 		// Optimistic UI update
-		setMessages((prev) => [
-			...prev,
-			{ from: myPeerId, text: textToSend, time: Date.now() },
-		]);
+		setMessageStore((prev) => {
+			const thread = prev[targetPeerId] ?? [];
+			const updated = {
+				...prev,
+				[targetPeerId]: [
+					...thread,
+					{ id, from: myPeerId, text: textToSend, time: Date.now() },
+				],
+			};
+			localStorage.setItem("gd_direct_chats", JSON.stringify(updated));
+			return updated;
+		});
 
 		await sendMessage.mutateAsync({
 			from: myPeerId,
