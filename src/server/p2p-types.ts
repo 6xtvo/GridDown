@@ -9,6 +9,7 @@ export interface PeerInfo {
 }
 
 export interface WebRTCSignal {
+	id?: string;
 	from: string;
 	to: string;
 	type: "offer" | "answer" | "ice-candidate";
@@ -17,6 +18,7 @@ export interface WebRTCSignal {
 }
 
 export interface P2PMessage {
+	id?: string;
 	from: string;
 	type: string;
 	data: unknown;

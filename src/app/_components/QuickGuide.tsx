@@ -266,15 +266,16 @@ export function QuickGuide() {
 
 				{/* ── TOGGLE BUTTON ─────────────────────────── */}
 				<button
-					className="group relative flex items-center gap-3 overflow-hidden transition-all duration-200"
+					className="group relative flex items-center justify-center transition-all duration-200"
 					onClick={() => setIsOpen((v) => !v)}
 					style={{
+						width: 36,
+						height: 36,
 						background: isOpen ? "rgba(220,38,38,0.88)" : "rgba(5,1,1,0.96)",
 						border: `1px solid ${isOpen ? "rgba(220,38,38,0.95)" : "rgba(220,38,38,0.32)"}`,
 						boxShadow: isOpen
 							? "0 0 20px rgba(220,38,38,0.38), 0 0 50px rgba(220,38,38,0.1)"
 							: "0 0 10px rgba(220,38,38,0.1)",
-						padding: "9px 16px",
 					}}
 					type="button"
 				>
@@ -296,24 +297,11 @@ export function QuickGuide() {
 							}}
 						/>
 					)}
-
-					<div
-						className="relative z-10 flex items-center justify-center w-5 h-5 text-xs font-bold transition-colors duration-200"
-						style={{
-							border: `1px solid ${isOpen ? "rgba(0,0,0,0.2)" : "rgba(220,38,38,0.28)"}`,
-							color: isOpen ? "#000" : "#f87171",
-						}}
+					<span
+						className="relative z-10 text-xs font-bold transition-colors duration-200"
+						style={{ color: isOpen ? "#000" : "#f87171" }}
 					>
 						{isOpen ? "×" : "?"}
-					</div>
-
-					<span
-						className="relative z-10 text-[10px] tracking-[0.3em] transition-colors duration-200"
-						style={{
-							color: isOpen ? "rgba(0,0,0,0.9)" : "rgba(220,38,38,0.9)",
-						}}
-					>
-						{isOpen ? "CLOSE" : "SYS_GUIDE"}
 					</span>
 				</button>
 			</div>

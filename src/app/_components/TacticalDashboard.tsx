@@ -65,7 +65,7 @@ export type Incident = {
 };
 
 // msgId for exact dedup; image for optional photo attachments
-type ChatMsg = { from: string; text: string; time: number; msgId: string; image?: string };
+type ChatMsg = { from: string; image?: string | null; text: string; time: number; msgId: string };
 type RouteState = { geojson: GeoJSON.LineString; eta: number };
 
 const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
@@ -183,7 +183,7 @@ export function TacticalDashboard() {
 			const updated = { ...prev };
 			let changed = false;
 			incomingMessages.forEach((m) => {
-				// skip messages we sent ourselves — already in local state
+				// FIX: skip messages we sent ourselves — they're already in local state
 				if (m.from === profile.username) return;
 				try {
 					const p = JSON.parse(String(m.data));
@@ -191,7 +191,7 @@ export function TacticalDashboard() {
 					const room = p.data.incidentId as string;
 					const msgId = p.data.msgId as string;
 					if (!updated[room]) updated[room] = [];
-					// deduplicate by msgId
+					// FIX: deduplicate by msgId instead of timestamp
 					if (!updated[room].some((x) => x.msgId === msgId)) {
 						updated[room].push({
 							from: m.from,
@@ -228,7 +228,7 @@ export function TacticalDashboard() {
 						const room: ChatMsg[] = merged[roomId] ?? [];
 						const dedupedRoom = [...room];
 						msgs.forEach((msg) => {
-							// deduplicate by msgId
+							// FIX: deduplicate by msgId instead of timestamp + from
 							if (!dedupedRoom.some((x) => x.msgId === msg.msgId)) {
 								dedupedRoom.push(msg);
 								changed = true;
@@ -304,33 +304,33 @@ export function TacticalDashboard() {
 
 		const text = chatInput.trim();
 		const image = chatImage ?? undefined;
-		// generate unique msgId for exact deduplication across all effects
-		const msgId = Math.random().toString(36).slice(2, 11);
-		const now = Date.now();
-
 		setChatInput("");
 		setChatImage(null);
+		const now = Date.now();
+		// FIX: generate a unique msgId so every dedup check across all effects is exact
+		const msgId = Math.random().toString(36).slice(2, 11);
 
-		// add to local state immediately
+		// Add to local log immediately
 		setChatLogs((prev) => {
 			const updated = {
 				...prev,
 				[selected]: [
 					...(prev[selected] ?? []),
-					{ from: profile.username, text, image, time: now, msgId },
+					{ from: profile.username, text, time: now, msgId, image },
 				],
 			};
 			localStorage.setItem("gd_chats", JSON.stringify(updated));
 			return updated;
 		});
-
-		if (peers) {
+		// Broadcast text only (images are too large for p2p payload)
+		if (peers && text) {
 			const payload = JSON.stringify({
 				type: "INCIDENT_CHAT",
-				data: { incidentId: selected, text, image, msgId },
+				// FIX: include msgId in the broadcast payload
+				data: { incidentId: selected, text, msgId },
 			});
 
-			// deduplicate peers by peerId before broadcasting
+			// FIX: deduplicate peers by peerId before broadcasting
 			const uniquePeers = peers
 				.filter((p) => p.peerId !== profile.username)
 				.filter((p, i, arr) => arr.findIndex((x) => x.peerId === p.peerId) === i);
