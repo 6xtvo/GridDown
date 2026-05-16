@@ -163,6 +163,18 @@ export function TacticalDashboard() {
 			msgId: getChatMessageId(room, message, index),
 		}));
 
+	const readPersistedChats = () => {
+		const savedChat = localStorage.getItem("gd_chats");
+		if (!savedChat) return {} as Record<string, ChatMsg[]>;
+		const parsed = JSON.parse(savedChat) as Record<string, ChatMsg[]>;
+		return Object.fromEntries(
+			Object.entries(parsed).map(([room, messages]) => [
+				room,
+				normalizeChatThread(room, messages),
+			]),
+		) as Record<string, ChatMsg[]>;
+	};
+
 	const base = profile ?? DEFAULT_LOCATION;
 
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -183,14 +195,7 @@ export function TacticalDashboard() {
 		else setShowOnboard(true);
 		const savedInc = localStorage.getItem("gd_incidents");
 		if (savedInc) setIncidents(JSON.parse(savedInc));
-		const savedChat = localStorage.getItem("gd_chats");
-		if (savedChat) {
-			const parsed = JSON.parse(savedChat) as Record<string, ChatMsg[]>;
-			const normalized = Object.fromEntries(
-				Object.entries(parsed).map(([room, messages]) => [room, normalizeChatThread(room, messages)]),
-			) as Record<string, ChatMsg[]>;
-			setChatLogs(normalized);
-		}
+		setChatLogs(readPersistedChats());
 	}, []);
 
 	useEffect(() => {
@@ -337,6 +342,10 @@ export function TacticalDashboard() {
 	};
 
 	const openChat = (incId: string) => {
+		setChatLogs((prev) => ({
+			...readPersistedChats(),
+			...prev,
+		}));
 		setSelected(incId);
 		setRightPanel("chat");
 	};
