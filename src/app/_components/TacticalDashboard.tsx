@@ -27,6 +27,7 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
 // Define dynamic Incident Type
 export type Incident = {
 	id: string | number;
+	type: string;
 	priority: string;
 	time: string;
 	msg: string;
@@ -51,7 +52,6 @@ export function TacticalDashboard() {
 		age: string;
 	} | null>(null);
 	
-    // Removed static initialization. Now starts empty and pulls from network.
 	const [localIncidents, setLocalIncidents] = useState<Incident[]>([]);
 
 	// UI State
@@ -64,7 +64,6 @@ export function TacticalDashboard() {
 	const [now, setNow] = useState<Date | null>(null);
 
 	// --- P2P Network Hook ---
-	// Polls for peers and their metadata to populate the feed
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
 		refetchInterval: 3000,
 		enabled: mounted,
@@ -85,17 +84,16 @@ export function TacticalDashboard() {
 		return () => clearInterval(timer);
 	}, []);
 
-	// --- Active Feed Computation ---
-	// Merges local incidents with real-time P2P incidents broadcasted by UrgencyBoard
+	// --- Active Feed Computation & Sorting ---
 	const activeFeed = [...localIncidents];
 	if (peers) {
 		peers.forEach((p) => {
 			const peerIncidents = (p.metadata?.incidents as any[]) || [];
 			peerIncidents.forEach((inc) => {
-				// Prevent duplicates
 				if (!activeFeed.some((existing) => String(existing.id) === String(inc.id))) {
 					activeFeed.push({
 						id: inc.id,
+						type: inc.type || "REQUEST", // Fallback for older incidents
 						priority: inc.priority,
 						time: inc.time,
 						msg: inc.msg,
@@ -108,6 +106,19 @@ export function TacticalDashboard() {
 			});
 		});
 	}
+
+	// Priority > Time sorting
+	const priorityWeight: Record<string, number> = { HIGH: 3, MED: 2, LOW: 1 };
+	activeFeed.sort((a, b) => {
+		const pA = priorityWeight[a.priority] || 0;
+		const pB = priorityWeight[b.priority] || 0;
+		
+		if (pA !== pB) {
+			return pB - pA; // Higher priority first
+		}
+		// If priorities are equal, sort by newest time first
+		return b.time.localeCompare(a.time); 
+	});
 
 	// Form Handlers
 	const handleCreateProfile = (e: React.FormEvent<HTMLFormElement>) => {
@@ -144,6 +155,12 @@ export function TacticalDashboard() {
 		}
 	};
 
+	const getTypeColor = (type: string) => {
+		if (type === "OFFER") return "bg-blue-500 text-blue-500 border-blue-500";
+		if (type === "ANNOUNCEMENT") return "bg-emerald-500 text-emerald-500 border-emerald-500";
+		return "bg-red-600 text-red-500 border-red-600";
+	};
+
 	// Time calculations
 	let currentTimeString = "--:--:--";
 	let blackoutString = "T+ --D:--H:--M:--S";
@@ -164,7 +181,7 @@ export function TacticalDashboard() {
 		<div className="flex w-full flex-col gap-8">
 			{/* --- TACTICAL NAV --- */}
 			<nav className="flex w-full items-center justify-between border-b-2 border-red-600 bg-black px-8 py-4">
-				<div className="font-sans text-3xl tracking-widest text-red-600 font-seven">
+				<div className="font-sans text-3xl tracking-widest text-red-600">
 					GRID<span className="text-white">DOWN</span>
 				</div>
 
@@ -201,15 +218,13 @@ export function TacticalDashboard() {
 							onClick={() => setIsReportModalOpen(true)}
 							type="button"
 						>
-							REPORT INTEL
+							ACCESS SYSTEM
 						</button>
 					</div>
 				)}
 			</nav>
 
 			{/* --- MODALS --- */}
-
-			{/* 1. Profile Creation Modal */}
 			{isProfileModalOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
 					<form
@@ -270,12 +285,9 @@ export function TacticalDashboard() {
 				</div>
 			)}
 
-			{/* 2. P2P Urgency Board Floating Window */}
 			{isReportModalOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
 					<div className="relative w-full max-w-[95vw] lg:max-w-7xl animate-in fade-in duration-200">
-						
-						{/* Floating Window Header & Close Button */}
 						<div className="flex justify-between items-end mb-2">
 							<div className="font-seven text-xl tracking-widest text-yellow-500 animate-pulse">
 								// SECURE P2P UPLINK ESTABLISHED
@@ -288,12 +300,9 @@ export function TacticalDashboard() {
 								CLOSE TRANSMISSION [X]
 							</button>
 						</div>
-						
-						{/* Mounted P2P UrgencyBoard Container */}
 						<div className="max-h-[85vh] overflow-y-auto border-2 border-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.2)]">
 							<UrgencyBoard />
 						</div>
-
 					</div>
 				</div>
 			)}
@@ -322,7 +331,6 @@ export function TacticalDashboard() {
 					{/* Main Feed */}
 					<div className="flex-1 overflow-y-auto border-red-600 border-b-2 bg-zinc-950 lg:border-r-2 lg:border-b-0">
 						<div className="space-y-4 p-4">
-                            {/* Empty state when no incidents exist */}
 							{activeFeed.length === 0 && (
 								<div className="flex h-32 items-center justify-center border border-dashed border-zinc-800 text-zinc-600">
 									<p className="font-jetbrains text-xs italic">
@@ -331,47 +339,48 @@ export function TacticalDashboard() {
 								</div>
 							)}
 
-							{activeFeed.map((inc) => (
-								<button
-									className={`relative cursor-pointer w-full border p-3 transition-colors ${selectedIncidentId === inc.id ? "border-green-500 bg-zinc-900/80" : "border-zinc-800 bg-zinc-900 hover:border-red-600/50"}`}
-									key={inc.id}
-									onClick={() => handleMapClick(inc)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") handleMapClick(inc);
-									}}
-									tabIndex={0}
-									type="button"
-								>
-									{inc.priority === "HIGH" && (
-										<div className="absolute bottom-0 left-0 top-0 w-1 bg-red-600" />
-									)}
-									{inc.priority === "MED" && (
-										<div className="absolute bottom-0 left-0 top-0 w-1 bg-yellow-500" />
-									)}
+							{activeFeed.map((inc) => {
+								const bgClass = getTypeColor(inc.type).split(' ')[0];
+								return (
+									<button
+										className={`relative cursor-pointer w-full border p-3 transition-colors ${selectedIncidentId === inc.id ? "border-green-500 bg-zinc-900/80" : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}
+										key={inc.id}
+										onClick={() => handleMapClick(inc)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") handleMapClick(inc);
+										}}
+										tabIndex={0}
+										type="button"
+									>
+										<div className={`absolute bottom-0 left-0 top-0 w-1 ${bgClass}`} />
 
-									<div className="flex justify-between font-seven text-red-600 text-xl tracking-wider">
-										<span
-											className={`${inc.priority === "MED" ? "text-yellow-500" : ""}`}
-										>
-											PRIORITY {inc.priority}
-										</span>
-										<span className="text-zinc-500">{inc.time}</span>
-									</div>
+										<div className="flex justify-between font-seven text-xl tracking-wider">
+											<div className="flex items-center gap-3">
+												<span className={`ml-2 px-2 py-0.5 text-xs text-black ${bgClass}`}>
+													{inc.type}
+												</span>
+												<span className={inc.priority === "HIGH" ? "text-red-500" : inc.priority === "MED" ? "text-yellow-500" : "text-zinc-500"}>
+													PRIORITY {inc.type === "OFFER" ? "N/A" : inc.priority}
+												</span>
+											</div>
+											<span className="text-zinc-500">{inc.time}</span>
+										</div>
 
-									<p className="mt-2 font-jetbrains text-sm text-zinc-300 leading-relaxed text-left">
-										{inc.msg}
-									</p>
+										<p className="mt-3 font-jetbrains text-sm text-zinc-300 leading-relaxed text-left">
+											{inc.msg}
+										</p>
 
-									<div className="mt-3 flex items-center justify-between border-zinc-800 border-t pt-2 font-seven text-xs tracking-widest">
-										<span className="text-zinc-500">
-											OP: {inc.author} // LOC: {inc.loc}
-										</span>
-										<span className="text-red-500/70">
-											[{inc.lat.toFixed(4)}, {inc.lng.toFixed(4)}]
-										</span>
-									</div>
-								</button>
-							))}
+										<div className="mt-3 flex items-center justify-between border-zinc-800 border-t pt-2 font-seven text-xs tracking-widest">
+											<span className="text-zinc-500">
+												OP: {inc.author} // LOC: {inc.loc}
+											</span>
+											<span className="text-red-500/70">
+												[{inc.lat.toFixed(4)}, {inc.lng.toFixed(4)}]
+											</span>
+										</div>
+									</button>
+								);
+							})}
 						</div>
 					</div>
 
@@ -420,50 +429,51 @@ export function TacticalDashboard() {
 								</div>
 							</Marker>
 
-							{activeFeed.map((inc) => (
-								<Marker
-									anchor="center"
-									key={inc.id}
-									latitude={inc.lat}
-									longitude={inc.lng}
-								>
-									{/* biome-ignore lint/a11y/useKeyWithClickEvents: map marker; keyboard nav handled on incident cards */}
-									{/* biome-ignore lint/a11y/noStaticElementInteractions: map marker */}
-									<div
-										className="group relative cursor-pointer"
-										onClick={() => handleMapClick(inc)}
-										onMouseEnter={() => setHoveredId(inc.id)}
-										onMouseLeave={() => setHoveredId(null)}
+							{activeFeed.map((inc) => {
+								const bgClass = getTypeColor(inc.type).split(' ')[0];
+								return (
+									<Marker
+										anchor="center"
+										key={inc.id}
+										latitude={inc.lat}
+										longitude={inc.lng}
 									>
-										<div className="relative flex h-8 w-8 items-center justify-center">
-											<span
-												className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-30 ${inc.priority === "MED" ? "bg-yellow-500" : "bg-red-600"}`}
-											/>
-											<div
-												className={`relative z-10 h-3 w-3 rotate-45 border border-black ${inc.priority === "MED" ? "bg-yellow-500" : "bg-red-600"}`}
-											/>
-										</div>
-
-										{hoveredId === inc.id && (
-											<div className="pointer-events-none absolute bottom-10 left-1/2 z-50 w-48 -translate-x-1/2 border border-red-600 bg-zinc-950 p-2 shadow-lg shadow-red-900/20">
-												<div className="mb-1 border-red-600/30 border-b pb-1 font-seven text-red-500 text-sm">
-													DIST:{" "}
-													{getDistance(
-														BASE_LOCATION.lat,
-														BASE_LOCATION.lng,
-														inc.lat,
-														inc.lng,
-													)}{" "}
-													KM
-												</div>
-												<p className="font-jetbrains text-[10px] text-zinc-300 leading-tight">
-													{inc.msg}
-												</p>
+										<div
+											className="group relative cursor-pointer"
+											onClick={() => handleMapClick(inc)}
+											onMouseEnter={() => setHoveredId(inc.id)}
+											onMouseLeave={() => setHoveredId(null)}
+										>
+											<div className="relative flex h-8 w-8 items-center justify-center">
+												<span
+													className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-30 ${bgClass}`}
+												/>
+												<div
+													className={`relative z-10 h-3 w-3 rotate-45 border border-black ${bgClass}`}
+												/>
 											</div>
-										)}
-									</div>
-								</Marker>
-							))}
+
+											{hoveredId === inc.id && (
+												<div className="pointer-events-none absolute bottom-10 left-1/2 z-50 w-48 -translate-x-1/2 border border-red-600 bg-zinc-950 p-2 shadow-lg shadow-red-900/20">
+													<div className="mb-1 border-red-600/30 border-b pb-1 font-seven text-red-500 text-sm">
+														DIST:{" "}
+														{getDistance(
+															BASE_LOCATION.lat,
+															BASE_LOCATION.lng,
+															inc.lat,
+															inc.lng,
+														)}{" "}
+														KM
+													</div>
+													<p className="font-jetbrains text-[10px] text-zinc-300 leading-tight">
+														{inc.msg}
+													</p>
+												</div>
+											)}
+										</div>
+									</Marker>
+								);
+							})}
 						</MapGL>
 
 						<div className="pointer-events-none absolute right-4 bottom-4 z-10 border border-red-600 bg-black/80 p-2 text-right font-seven tracking-wider">

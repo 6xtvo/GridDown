@@ -12,3 +12,30 @@
 	/* Create the 'font-seven' utility class for your custom local font */
 	--font-seven: var(--font-seven-custom), ui-monospace, monospace;
 }
+
+/* Firefox Scrollbar */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: #dc2626 transparent; /* Tailwind red-600 and transparent track */
+}
+
+/* WebKit Scrollbar (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+	width: 4px; /* Thin vertical line */
+	height: 4px; /* Thin horizontal line */
+}
+
+::-webkit-scrollbar-track {
+	background: rgba(0, 0, 0, 0.2); /* Slightly visible dark track to ground it */
+	border-left: 1px solid rgba(220, 38, 38, 0.1); /* Very faint red line on the track */
+}
+
+::-webkit-scrollbar-thumb {
+	background-color: #dc2626; /* Tailwind red-600 */
+	border-radius: 0px; /* Kept square/blocky for the tactical aesthetic */
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background-color: #ef4444; /* Brighter red when hovering (Tailwind red-500) */
+	box-shadow: 0 0 5px rgba(220, 38, 38, 0.8);
+}
