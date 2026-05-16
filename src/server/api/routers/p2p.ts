@@ -12,6 +12,7 @@
 
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
+import { lanDiscovery } from "@/server/lan-discovery";
 import { MemoryPeerRegistry } from "@/server/peer-registry";
 import { webrtcManager } from "@/server/webrtc-manager";
 
@@ -41,13 +42,15 @@ export const p2pRouter = createTRPCRouter({
 		)
 		.mutation(async ({ input }) => {
 			const registry = getRegistry();
-			await registry.register({
+			const peer = {
 				peerId: input.peerId,
 				ip: input.ip,
 				port: input.port,
 				metadata: input.metadata,
 				lastSeen: Date.now(),
-			});
+			};
+			await registry.register(peer);
+			lanDiscovery.upsertLocalPeer(peer);
 			webrtcManager.registerConnection(input.peerId, input.metadata);
 			return { success: true, peerId: input.peerId };
 		}),
@@ -60,6 +63,7 @@ export const p2pRouter = createTRPCRouter({
 		.mutation(async ({ input }) => {
 			const registry = getRegistry();
 			await registry.unregister(input.peerId);
+			lanDiscovery.removeLocalPeer(input.peerId);
 			webrtcManager.closeConnection(input.peerId);
 			return { success: true };
 		}),
@@ -71,7 +75,7 @@ export const p2pRouter = createTRPCRouter({
 	listPeers: publicProcedure.query(async () => {
 		const registry = getRegistry();
 		const peers = await registry.list();
-		return peers.map((peer) => ({
+		return lanDiscovery.getAllPeers(peers).map((peer) => ({
 			peerId: peer.peerId,
 			ip: peer.ip,
 			port: peer.port,
@@ -92,14 +96,21 @@ export const p2pRouter = createTRPCRouter({
 				data: z.record(z.unknown()),
 			}),
 		)
-		.mutation(({ input }) => {
-			webrtcManager.queueSignal({
+		.mutation(async ({ input }) => {
+			const signal = {
 				from: input.from,
 				to: input.to,
 				type: input.type,
 				data: input.data,
 				timestamp: Date.now(),
-			});
+			};
+			const destination = lanDiscovery.resolvePeer(input.to);
+			if (destination.kind === "remote" && destination.relayUrls) {
+				await lanDiscovery.forwardSignal(destination.relayUrls, signal);
+				return { success: true, relayed: true };
+			}
+
+			webrtcManager.queueSignal(signal);
 			return { success: true };
 		}),
 
@@ -126,12 +137,25 @@ export const p2pRouter = createTRPCRouter({
 				data: z.unknown(),
 			}),
 		)
-		.mutation(({ input }) => {
-			webrtcManager.storeMessage(input.to, {
+		.mutation(async ({ input }) => {
+			const message = {
 				from: input.from,
+				to: input.to,
 				type: input.type,
 				data: input.data,
 				timestamp: Date.now(),
+			};
+			const destination = lanDiscovery.resolvePeer(input.to);
+			if (destination.kind === "remote" && destination.relayUrls) {
+				await lanDiscovery.forwardMessage(destination.relayUrls, message);
+				return { success: true, relayed: true };
+			}
+
+			webrtcManager.storeMessage(message.to, {
+				from: message.from,
+				type: message.type,
+				data: message.data,
+				timestamp: message.timestamp,
 			});
 			return { success: true };
 		}),
@@ -166,6 +190,7 @@ export const p2pRouter = createTRPCRouter({
 		.mutation(async ({ input }) => {
 			const registry = getRegistry();
 			const removed = await registry.cleanup(input.maxAge);
+			lanDiscovery.setLocalPeers(await registry.list());
 			return { removed };
 		}),
 
@@ -173,7 +198,11 @@ export const p2pRouter = createTRPCRouter({
 		.input(z.object({ peerId: z.string() }))
 		.query(async ({ input }) => {
 			const registry = getRegistry();
-			const peer = await registry.get(input.peerId);
+			const localPeer = await registry.get(input.peerId);
+			if (localPeer) return localPeer;
+
+			const allPeers = lanDiscovery.getAllPeers(await registry.list());
+			const peer = allPeers.find((p) => p.peerId === input.peerId) ?? null;
 			return peer ?? null;
 		}),
 });

@@ -159,11 +159,17 @@ export function TacticalDashboard() {
 
 	useEffect(() => {
 		if (!mounted || !profile) return;
-		register.mutate({
-			peerId: profile.username,
-			ip: "client",
-			metadata: { incidents },
-		});
+		const publishPresence = () => {
+			register.mutate({
+				peerId: profile.username,
+				ip: "client",
+				metadata: { incidents },
+			});
+		};
+
+		publishPresence();
+		const intervalId = window.setInterval(publishPresence, 5000);
+		return () => window.clearInterval(intervalId);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [incidents, profile]);
 
