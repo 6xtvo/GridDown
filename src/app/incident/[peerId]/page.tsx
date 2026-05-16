@@ -19,7 +19,9 @@ export default function IncidentChatPage() {
 	const [isMounted, setIsMounted] = useState(false);
 	const [myPeerId, setMyPeerId] = useState("CONNECTING...");
 	const [input, setInput] = useState("");
-	const [messageStore, setMessageStore] = useState<Record<string, DirectMessage[]>>({});
+	const [messageStore, setMessageStore] = useState<
+		Record<string, DirectMessage[]>
+	>({});
 	const bottomRef = useRef<HTMLDivElement>(null);
 	const messages = messageStore[targetPeerId] ?? [];
 
@@ -56,7 +58,9 @@ export default function IncidentChatPage() {
 
 		const savedChats = localStorage.getItem("gd_direct_chats");
 		if (savedChats) {
-			setMessageStore(JSON.parse(savedChats) as Record<string, DirectMessage[]>);
+			setMessageStore(
+				JSON.parse(savedChats) as Record<string, DirectMessage[]>,
+			);
 		}
 	}, []);
 
