@@ -30,37 +30,6 @@ export default async function Home() {
 					}}
 				/>
 
-				{/* Top threat strip */}
-				<div className="relative z-10 w-full border-b border-red-900/40 bg-[#0a0000]/80 backdrop-blur-sm">
-					<div className="flex items-center justify-between px-6 py-1.5">
-						<div className="flex items-center gap-6">
-							{["NODE_ALPHA", "NODE_BRAVO", "NODE_CHARLIE"].map((node, i) => (
-								<div className="flex items-center gap-1.5" key={node}>
-									<span
-										className={`h-1.5 w-1.5 rounded-full ${i === 0 ? "bg-green-400" : i === 1 ? "bg-yellow-400" : "bg-red-500"}`}
-										style={i === 2 ? { animation: "pulse 2s infinite" } : {}}
-									/>
-									<span className="text-[9px] tracking-[0.3em] text-zinc-600">
-										{node}
-									</span>
-									<span
-										className={`text-[9px] tracking-[0.2em] ${i === 0 ? "text-green-600" : i === 1 ? "text-yellow-600" : "text-red-700"}`}
-									>
-										{i === 0 ? "LIVE" : i === 1 ? "DELAY" : "DARK"}
-									</span>
-								</div>
-							))}
-						</div>
-						<div className="flex items-center gap-6 text-[9px] tracking-[0.25em] text-zinc-700">
-							<span>ENCRYPTION: AES-256</span>
-							<span className="text-red-900">|</span>
-							<span>PROTOCOL: MESH_P2P</span>
-							<span className="text-red-900">|</span>
-							<span>UPLINK: STABLE</span>
-						</div>
-					</div>
-				</div>
-
 				{/* Main dashboard */}
 				<div className="relative z-10 w-full">
 					<TacticalDashboard />

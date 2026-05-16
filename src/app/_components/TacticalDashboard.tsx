@@ -3,7 +3,53 @@
 import { useEffect, useRef, useState } from "react";
 import MapGL, { Layer, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { z } from "zod";
 import { api } from "@/trpc/react";
+
+// ─── Skill definitions ────────────────────────────────────────────────────────
+const SKILL_OPTIONS = [
+	"Medic",
+	"Field Surgery",
+	"Triage",
+	"Engineer",
+	"Electrical",
+	"Plumbing",
+	"Structural",
+	"Radio Operator",
+	"Navigation",
+	"Logistics",
+	"Security",
+	"Search & Rescue",
+	"Firefighting",
+	"Water Purification",
+	"Food Distribution",
+	"Counselling",
+	"Translator",
+	"Driver",
+	"Drone Operator",
+	"IT / Comms",
+] as const;
+
+type Skill = (typeof SKILL_OPTIONS)[number];
+
+// ─── Zod schema ───────────────────────────────────────────────────────────────
+const profileSchema = z.object({
+	username: z
+		.string()
+		.min(2, "Min 2 characters")
+		.max(20, "Max 20 characters")
+		.regex(/^[A-Z0-9-_]+$/i, "Letters, numbers, hyphens only"),
+	age: z
+		.number({ invalid_type_error: "Enter a number" })
+		.int("Whole numbers only")
+		.min(16, "Must be 16 or older")
+		.max(99, "Must be under 100"),
+	skills: z.array(z.string()).min(1, "Select at least one skill"),
+});
+
+type ProfileErrors = Partial<
+	Record<keyof z.infer<typeof profileSchema>, string>
+>;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Incident = {
@@ -30,9 +76,9 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-	REQUEST: "REQ",
-	OFFER: "OFR",
-	ANNOUNCE: "ANN",
+	REQUEST: "REQUEST",
+	OFFER: "OFFER",
+	ANNOUNCE: "ANNOUNCEMENT",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -274,13 +320,38 @@ export function TacticalDashboard() {
 		}
 	};
 
+	// ── Add to component state (alongside existing useState calls) ──────────────
+	const [obUsername, setObUsername] = useState("");
+	const [obAge, setObAge] = useState("");
+	const [obSkills, setObSkills] = useState<Skill[]>([]);
+	const [obErrors, setObErrors] = useState<ProfileErrors>({});
+	const [skillSearch, setSkillSearch] = useState("");
+
+	// ── Replace handleSaveProfile ────────────────────────────────────────────────
 	const handleSaveProfile = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!hqDraft) return;
-		const fd = new FormData(e.currentTarget);
+
+		const parsed = profileSchema.safeParse({
+			username: obUsername,
+			age: obAge === "" ? undefined : Number(obAge),
+			skills: obSkills,
+		});
+
+		if (!parsed.success) {
+			const errs: ProfileErrors = {};
+			parsed.error.errors.forEach((err) => {
+				const key = err.path[0] as keyof ProfileErrors;
+				if (!errs[key]) errs[key] = err.message;
+			});
+			setObErrors(errs);
+			return;
+		}
+
+		setObErrors({});
 		const p = {
-			username: fd.get("username") as string,
-			role: fd.get("role") as string,
+			username: parsed.data.username.toUpperCase(),
+			role: parsed.data.skills.slice(0, 2).join(" / "),
 			lat: hqDraft.lat,
 			lng: hqDraft.lng,
 		};
@@ -288,7 +359,6 @@ export function TacticalDashboard() {
 		localStorage.setItem("gd_profile", JSON.stringify(p));
 		setShowOnboard(false);
 	};
-
 	if (!mounted) return null;
 
 	return (
@@ -315,9 +385,30 @@ export function TacticalDashboard() {
 						<div className="flex items-center gap-1.5">
 							<span className="gd-live h-1.5 w-1.5 rounded-full bg-red-500" />
 							<span className="text-[10px] tracking-[0.2em] text-white/25">
-								{feed.length} ACTIVE
+								{feed.length} {feed.length === 1 ? "TASK" : "TASKS"}
 							</span>
 						</div>
+
+						{/* ── new stat chips ── */}
+						<div className="h-3 w-px bg-white/8" />
+						<div className="flex items-center gap-1.5">
+							<span
+								className="gd-live h-1.5 w-1.5 rounded-full bg-green-400"
+								style={{ boxShadow: "0 0 4px rgba(74,222,128,0.5)" }}
+							/>
+							<span className="text-[10px] tracking-[0.2em] text-white/25">
+								{(peers?.length ?? 0) + (profile ? 1 : 0)} ONLINE
+							</span>
+						</div>
+						<div className="h-3 w-px bg-white/8" />
+						<span className="text-[10px] tracking-[0.2em] text-white/25">
+							{
+								feed.filter(
+									(i) => i.type === "REQUEST" && i.priority === "HIGH",
+								).length
+							}{" "}
+							HIGH PRIORITY
+						</span>
 					</div>
 					<div className="flex items-center gap-5">
 						{profile ? (
@@ -327,15 +418,6 @@ export function TacticalDashboard() {
 									{" · "}
 									{profile.role}
 								</span>
-								<button
-									className="text-[10px] tracking-widest text-white/20 transition-colors hover:text-red-500"
-									onClick={() => {
-										localStorage.clear();
-										window.location.reload();
-									}}
-								>
-									RESET
-								</button>
 							</>
 						) : (
 							<button
@@ -364,60 +446,65 @@ export function TacticalDashboard() {
 										style={{ border: "1px solid rgba(255,255,255,0.07)" }}
 										value={postMsg}
 									/>
-									<div className="flex flex-wrap items-center gap-1.5">
-										{(["REQUEST", "OFFER", "ANNOUNCE"] as const).map((t) => (
-											<button
-												className="px-2 py-1 text-[9px] tracking-widest transition-colors"
-												key={t}
-												onClick={() => setPostType(t)}
-												style={{
-													border: `1px solid ${postType === t ? TYPE_COLOR[t] + "55" : "rgba(255,255,255,0.07)"}`,
-													color:
-														postType === t
-															? TYPE_COLOR[t]
-															: "rgba(255,255,255,0.25)",
-													background:
-														postType === t
-															? TYPE_COLOR[t] + "0f"
-															: "transparent",
-												}}
-											>
-												{TYPE_LABEL[t]}
-											</button>
-										))}
-										{postType === "REQUEST" &&
-											(["HIGH", "MED", "LOW"] as const).map((p) => (
+									<div className="flex flex-col gap-1.5">
+										<div className="flex items-center gap-1.5">
+											{(["REQUEST", "OFFER", "ANNOUNCE"] as const).map((t) => (
 												<button
 													className="px-2 py-1 text-[9px] tracking-widest transition-colors"
-													key={p}
-													onClick={() => setPostPriority(p)}
+													key={t}
+													onClick={() => setPostType(t)}
 													style={{
-														border: `1px solid ${postPriority === p ? PRIORITY_DOT[p] + "55" : "rgba(255,255,255,0.07)"}`,
+														border: `1px solid ${postType === t ? TYPE_COLOR[t] + "55" : "rgba(255,255,255,0.07)"}`,
 														color:
-															postPriority === p
-																? PRIORITY_DOT[p]
-																: "rgba(255,255,255,0.2)",
+															postType === t
+																? TYPE_COLOR[t]
+																: "rgba(255,255,255,0.25)",
 														background:
-															postPriority === p
-																? PRIORITY_DOT[p] + "0f"
+															postType === t
+																? TYPE_COLOR[t] + "0f"
 																: "transparent",
 													}}
 												>
-													{p}
+													{TYPE_LABEL[t]}
 												</button>
 											))}
-										<button
-											className="ml-auto px-3 py-1 text-[10px] tracking-widest transition-all disabled:opacity-25"
-											disabled={!postMsg.trim()}
-											onClick={() => setPostStep("map")}
-											style={{
-												border: "1px solid rgba(239,68,68,0.35)",
-												color: "#f87171",
-												background: "rgba(239,68,68,0.06)",
-											}}
-										>
-											PIN →
-										</button>
+											<button
+												className="ml-auto px-3 py-1 text-[10px] tracking-widest transition-all disabled:opacity-25"
+												disabled={!postMsg.trim()}
+												onClick={() => setPostStep("map")}
+												style={{
+													border: "1px solid rgba(239,68,68,0.35)",
+													color: "#f87171",
+													background: "rgba(239,68,68,0.06)",
+												}}
+											>
+												POST →
+											</button>
+										</div>
+										{postType === "REQUEST" && (
+											<div className="flex items-center gap-1.5">
+												{(["HIGH", "MED", "LOW"] as const).map((p) => (
+													<button
+														className="px-2 py-1 text-[9px] tracking-widest transition-colors"
+														key={p}
+														onClick={() => setPostPriority(p)}
+														style={{
+															border: `1px solid ${postPriority === p ? PRIORITY_DOT[p] + "55" : "rgba(255,255,255,0.07)"}`,
+															color:
+																postPriority === p
+																	? PRIORITY_DOT[p]
+																	: "rgba(255,255,255,0.2)",
+															background:
+																postPriority === p
+																	? PRIORITY_DOT[p] + "0f"
+																	: "transparent",
+														}}
+													>
+														{p}
+													</button>
+												))}
+											</div>
+										)}
 									</div>
 								</div>
 							) : (
@@ -847,6 +934,8 @@ export function TacticalDashboard() {
 							background: "#0c0c0c",
 							border: "1px solid rgba(255,255,255,0.08)",
 							boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
+							maxHeight: "90vh",
+							overflowY: "auto",
 						}}
 					>
 						<h2 className="mb-1 text-sm tracking-[0.25em] text-white/60">
@@ -856,33 +945,143 @@ export function TacticalDashboard() {
 							Set your callsign to join the mesh.
 						</p>
 
-						<div className="flex flex-col gap-4">
-							{[
-								{
-									label: "CALLSIGN",
-									name: "username",
-									placeholder: "e.g. DELTA-7",
-								},
-								{
-									label: "ROLE / SKILLSET",
-									name: "role",
-									placeholder: "e.g. Medic, Engineer",
-								},
-							].map((f) => (
-								<div key={f.name}>
-									<label className="mb-1.5 block text-[9px] tracking-[0.25em] text-white/30">
-										{f.label}
-									</label>
-									<input
-										className="w-full bg-transparent px-3 py-2.5 text-[12px] text-white/75 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
-										name={f.name}
-										placeholder={f.placeholder}
-										required
-										style={{ border: "1px solid rgba(255,255,255,0.07)" }}
-									/>
-								</div>
-							))}
+						<div className="flex flex-col gap-5">
+							{/* ── Callsign ── */}
+							<div>
+								<label className="mb-1.5 flex items-center justify-between">
+									<span className="text-[9px] tracking-[0.25em] text-white/30">
+										CALLSIGN
+									</span>
+									{obErrors.username && (
+										<span className="text-[9px] text-red-500/70">
+											{obErrors.username}
+										</span>
+									)}
+								</label>
+								<input
+									className="w-full bg-transparent px-3 py-2.5 text-[12px] text-white/75 outline-none placeholder:text-white/15 uppercase transition-colors focus:bg-white/3"
+									onChange={(e) => {
+										setObUsername(e.target.value.toUpperCase());
+										setObErrors((prev) => ({ ...prev, username: undefined }));
+									}}
+									placeholder="e.g. DELTA-7"
+									style={{
+										border: `1px solid ${obErrors.username ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.07)"}`,
+									}}
+									value={obUsername}
+								/>
+							</div>
 
+							{/* ── Age ── */}
+							<div>
+								<label className="mb-1.5 flex items-center justify-between">
+									<span className="text-[9px] tracking-[0.25em] text-white/30">
+										AGE
+									</span>
+									{obErrors.age && (
+										<span className="text-[9px] text-red-500/70">
+											{obErrors.age}
+										</span>
+									)}
+								</label>
+								<input
+									className="w-full bg-transparent px-3 py-2.5 text-[12px] text-white/75 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
+									max={99}
+									min={16}
+									onChange={(e) => {
+										setObAge(e.target.value);
+										setObErrors((prev) => ({ ...prev, age: undefined }));
+									}}
+									placeholder="e.g. 34"
+									style={{
+										border: `1px solid ${obErrors.age ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.07)"}`,
+									}}
+									type="number"
+									value={obAge}
+								/>
+							</div>
+
+							{/* ── Skills pill selector ── */}
+							<div>
+								<label className="mb-1.5 flex items-center justify-between">
+									<span className="text-[9px] tracking-[0.25em] text-white/30">
+										SKILLS
+									</span>
+									{obErrors.skills && (
+										<span className="text-[9px] text-red-500/70">
+											{obErrors.skills}
+										</span>
+									)}
+								</label>
+
+								{/* Selected pills */}
+								{obSkills.length > 0 && (
+									<div
+										className="mb-2 flex flex-wrap gap-1.5 p-2"
+										style={{
+											border: "1px solid rgba(255,255,255,0.05)",
+											background: "rgba(255,255,255,0.02)",
+										}}
+									>
+										{obSkills.map((skill) => (
+											<button
+												className="flex items-center gap-1.5 px-2 py-0.5 text-[9px] tracking-wide transition-all hover:opacity-70"
+												key={skill}
+												onClick={() =>
+													setObSkills((prev) => prev.filter((s) => s !== skill))
+												}
+												style={{
+													background: "rgba(239,68,68,0.1)",
+													border: "1px solid rgba(239,68,68,0.3)",
+													color: "#f87171",
+												}}
+												type="button"
+											>
+												{skill}
+												<span className="text-red-500/50">✕</span>
+											</button>
+										))}
+									</div>
+								)}
+
+								{/* Search + options */}
+								<input
+									className="mb-2 w-full bg-transparent px-3 py-2 text-[11px] text-white/60 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
+									onChange={(e) => setSkillSearch(e.target.value)}
+									placeholder="Search skills..."
+									style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+									value={skillSearch}
+								/>
+
+								<div
+									className="flex flex-wrap gap-1.5 overflow-y-auto"
+									style={{ maxHeight: 120 }}
+								>
+									{SKILL_OPTIONS.filter(
+										(s) =>
+											s.toLowerCase().includes(skillSearch.toLowerCase()) &&
+											!obSkills.includes(s),
+									).map((skill) => (
+										<button
+											className="px-2 py-0.5 text-[9px] tracking-wide transition-all hover:border-white/20 hover:text-white/50"
+											key={skill}
+											onClick={() => {
+												setObSkills((prev) => [...prev, skill]);
+												setObErrors((prev) => ({ ...prev, skills: undefined }));
+											}}
+											style={{
+												border: "1px solid rgba(255,255,255,0.07)",
+												color: "rgba(255,255,255,0.25)",
+											}}
+											type="button"
+										>
+											+ {skill}
+										</button>
+									))}
+								</div>
+							</div>
+
+							{/* ── HQ map ── */}
 							<div>
 								<label className="mb-1.5 block text-[9px] tracking-[0.25em] text-white/30">
 									HQ LOCATION <span className="text-white/15">(click map)</span>
