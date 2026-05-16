@@ -168,4 +168,12 @@ export const p2pRouter = createTRPCRouter({
 			const removed = await registry.cleanup(input.maxAge);
 			return { removed };
 		}),
+
+	getPeer: publicProcedure
+		.input(z.object({ peerId: z.string() }))
+		.query(async ({ input }) => {
+			const registry = getRegistry();
+			const peer = await registry.get(input.peerId);
+			return peer ?? null;
+		}),
 });
