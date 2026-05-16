@@ -35,7 +35,10 @@ const relayBodySchema = z.discriminatedUnion("type", [
 export async function POST(req: Request) {
 	const parsed = relayBodySchema.safeParse(await req.json());
 	if (!parsed.success) {
-		return NextResponse.json({ error: "Invalid relay payload" }, { status: 400 });
+		return NextResponse.json(
+			{ error: "Invalid relay payload" },
+			{ status: 400 },
+		);
 	}
 
 	if (!lanDiscovery.isRelayTokenValid(parsed.data.token)) {

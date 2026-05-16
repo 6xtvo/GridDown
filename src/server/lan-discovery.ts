@@ -44,10 +44,11 @@ interface PeerLocation {
 }
 
 const DISCOVERY_PORT = Number(process.env.LAN_DISCOVERY_PORT ?? 41235);
-const DISCOVERY_GROUP =
-	process.env.LAN_DISCOVERY_MULTICAST ?? "239.255.42.99";
+const DISCOVERY_GROUP = process.env.LAN_DISCOVERY_MULTICAST ?? "239.255.42.99";
 const RELAY_TOKEN = process.env.LAN_RELAY_TOKEN ?? "gdgc-lan-dev-token";
-const HEARTBEAT_INTERVAL_MS = Number(process.env.LAN_HEARTBEAT_INTERVAL_MS ?? 5000);
+const HEARTBEAT_INTERVAL_MS = Number(
+	process.env.LAN_HEARTBEAT_INTERVAL_MS ?? 5000,
+);
 const STALE_NODE_MS = Number(process.env.LAN_STALE_NODE_MS ?? 20000);
 const DISCOVERY_SEND_TIMEOUT_MS = Number(
 	process.env.LAN_DISCOVERY_SEND_TIMEOUT_MS ?? 1500,
@@ -101,10 +102,18 @@ function getIPv4Interfaces(): IPv4Interface[] {
 
 function ipToInt(ip: string): number {
 	const parts = ip.split(".").map((p) => Number(p));
-	if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) {
+	if (
+		parts.length !== 4 ||
+		parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)
+	) {
 		return 0;
 	}
-	return ((parts[0] ?? 0) << 24) | ((parts[1] ?? 0) << 16) | ((parts[2] ?? 0) << 8) | (parts[3] ?? 0);
+	return (
+		((parts[0] ?? 0) << 24) |
+		((parts[1] ?? 0) << 16) |
+		((parts[2] ?? 0) << 8) |
+		(parts[3] ?? 0)
+	);
 }
 
 function intToIp(n: number): string {
@@ -270,7 +279,10 @@ export class LanDiscovery {
 		return { kind: "unknown" };
 	}
 
-	async forwardSignal(relayUrls: string[], signal: WebRTCSignal): Promise<void> {
+	async forwardSignal(
+		relayUrls: string[],
+		signal: WebRTCSignal,
+	): Promise<void> {
 		const payload: RelayPayload = {
 			type: "signal",
 			token: RELAY_TOKEN,
@@ -301,7 +313,10 @@ export class LanDiscovery {
 		return token === RELAY_TOKEN;
 	}
 
-	private async sendRelay(baseUrl: string, payload: RelayPayload): Promise<void> {
+	private async sendRelay(
+		baseUrl: string,
+		payload: RelayPayload,
+	): Promise<void> {
 		const candidates = [baseUrl];
 		let lastError: unknown = null;
 

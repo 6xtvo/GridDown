@@ -770,7 +770,7 @@ export function TacticalDashboard() {
 										<div className="relative w-fit">
 											<img
 												alt="attachment"
-												className="max-h-24 max-w-[200px] object-cover"
+												className="max-h-24 max-w-50 object-cover"
 												src={chatImage}
 												style={{ border: "1px solid rgba(255,255,255,0.08)" }}
 											/>
