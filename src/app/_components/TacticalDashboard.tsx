@@ -203,7 +203,7 @@ export function TacticalDashboard() {
 			<nav className="flex w-full items-center justify-between border-b-2 border-red-600 bg-black px-8 py-4">
 				<div className="flex items-center gap-4">
 					<Image
-						src="/icon.png"
+						src="/favicon.ico"
 						alt="GridDown Logo"
 						width={32}
 						height={32}
