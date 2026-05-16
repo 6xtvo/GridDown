@@ -1,38 +1,47 @@
+/**
+ * P2P tRPC Router
+ * Handles peer registration, WebRTC signalling, and message passing.
+ *
+ * How it works:
+ * 1. Each client registers itself with register()
+ * 2. Clients discover each other via listPeers()
+ * 3. WebRTC offer/answer/ICE signals are exchanged via sendSignal() / getSignals()
+ * 4. Once WebRTC is connected, messages go peer-to-peer (not through server)
+ * 5. If WebRTC fails, messages fall back to sendMessage() / getMessages()
+ */
+
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
 import { MemoryPeerRegistry } from "@/server/peer-registry";
 import { webrtcManager } from "@/server/webrtc-manager";
 
-// --- NEXT.JS HOT-RELOAD FIX ---
-// Attach the registry to globalThis so it doesn't get wiped during development
-const globalForP2P = globalThis as unknown as {
-	peerRegistry: MemoryPeerRegistry | undefined;
-};
+// Persist registry across Next.js hot reloads
+const globalForP2P = globalThis as { __peerRegistry?: MemoryPeerRegistry };
 
-function getPeerRegistry(): MemoryPeerRegistry {
-	if (!globalForP2P.peerRegistry) {
-		globalForP2P.peerRegistry = new MemoryPeerRegistry();
-		console.log("[P2P] Peer registry initialized");
+function getRegistry(): MemoryPeerRegistry {
+	if (!globalForP2P.__peerRegistry) {
+		globalForP2P.__peerRegistry = new MemoryPeerRegistry();
 	}
-	return globalForP2P.peerRegistry;
+	return globalForP2P.__peerRegistry;
 }
-// ------------------------------
 
 export const p2pRouter = createTRPCRouter({
+
 	/**
-	 * Register a peer with the network
+	 * Register yourself as an online peer.
+	 * Call this on page load, pass your WebRTC peer ID.
 	 */
 	register: publicProcedure
 		.input(
 			z.object({
 				peerId: z.string(),
-				ip: z.string(),
+				ip: z.string().default("unknown"),
 				port: z.number().optional(),
 				metadata: z.record(z.unknown()).optional(),
 			}),
 		)
 		.mutation(async ({ input }) => {
-			const registry = getPeerRegistry();
+			const registry = getRegistry();
 			await registry.register({
 				peerId: input.peerId,
 				ip: input.ip,
@@ -40,24 +49,29 @@ export const p2pRouter = createTRPCRouter({
 				metadata: input.metadata,
 				lastSeen: Date.now(),
 			});
-
-			// Register connection in WebRTC manager
 			webrtcManager.registerConnection(input.peerId, input.metadata);
-
-			console.log(`[P2P] Peer registered: ${input.peerId} (${input.ip})`);
-			const allPeers = await registry.list();
-			console.log(`[P2P] Total peers: ${allPeers.length}`);
-
 			return { success: true, peerId: input.peerId };
 		}),
 
 	/**
-	 * Get list of all peers on the network
+	 * Unregister when leaving the page.
+	 */
+	unregister: publicProcedure
+		.input(z.object({ peerId: z.string() }))
+		.mutation(async ({ input }) => {
+			const registry = getRegistry();
+			await registry.unregister(input.peerId);
+			webrtcManager.closeConnection(input.peerId);
+			return { success: true };
+		}),
+
+	/**
+	 * Get all online peers.
+	 * Poll this to discover who to connect to.
 	 */
 	listPeers: publicProcedure.query(async () => {
-		const registry = getPeerRegistry();
+		const registry = getRegistry();
 		const peers = await registry.list();
-		console.log(`[P2P] List peers called - returning ${peers.length} peers`);
 		return peers.map((peer) => ({
 			peerId: peer.peerId,
 			ip: peer.ip,
@@ -67,31 +81,8 @@ export const p2pRouter = createTRPCRouter({
 	}),
 
 	/**
-	 * Get specific peer information
-	 */
-	getPeer: publicProcedure
-		.input(z.object({ peerId: z.string() }))
-		.query(async ({ input }) => {
-			const registry = getPeerRegistry();
-			const peer = await registry.get(input.peerId);
-			return peer || null;
-		}),
-
-	/**
-	 * Unregister a peer (called when disconnecting)
-	 */
-	unregister: publicProcedure
-		.input(z.object({ peerId: z.string() }))
-		.mutation(async ({ input }) => {
-			const registry = getPeerRegistry();
-			await registry.unregister(input.peerId);
-			webrtcManager.closeConnection(input.peerId);
-			console.log(`[P2P] Peer unregistered: ${input.peerId}`);
-			return { success: true };
-		}),
-
-	/**
-	 * Send WebRTC signal (offer/answer/ICE candidate)
+	 * Send a WebRTC signal (offer / answer / ICE candidate) to another peer.
+	 * The other peer picks it up via getSignals().
 	 */
 	sendSignal: publicProcedure
 		.input(
@@ -102,7 +93,7 @@ export const p2pRouter = createTRPCRouter({
 				data: z.record(z.unknown()),
 			}),
 		)
-		.mutation(async ({ input }) => {
+		.mutation(({ input }) => {
 			webrtcManager.queueSignal({
 				from: input.from,
 				to: input.to,
@@ -110,30 +101,22 @@ export const p2pRouter = createTRPCRouter({
 				data: input.data,
 				timestamp: Date.now(),
 			});
-
-			console.log(
-				`[P2P] Signal queued: ${input.type} from ${input.from} to ${input.to}`,
-			);
 			return { success: true };
 		}),
 
 	/**
-	 * Retrieve pending signals for a peer
+	 * Retrieve pending signals addressed to you.
+	 * Poll this every ~1s while connecting.
 	 */
 	getSignals: publicProcedure
 		.input(z.object({ peerId: z.string() }))
-		.query(async ({ input }) => {
-			const signals = webrtcManager.getSignals(input.peerId);
-			if (signals.length > 0) {
-				console.log(
-					`[P2P] Retrieved ${signals.length} signals for ${input.peerId}`,
-				);
-			}
-			return signals;
+		.query(({ input }) => {
+			return webrtcManager.getSignals(input.peerId);
 		}),
 
 	/**
-	 * Store a message from one peer to another
+	 * Server-side message fallback.
+	 * Used when WebRTC connection fails.
 	 */
 	sendMessage: publicProcedure
 		.input(
@@ -144,59 +127,46 @@ export const p2pRouter = createTRPCRouter({
 				data: z.unknown(),
 			}),
 		)
-		.mutation(async ({ input }) => {
+		.mutation(({ input }) => {
 			webrtcManager.storeMessage(input.to, {
 				from: input.from,
 				type: input.type,
 				data: input.data,
 				timestamp: Date.now(),
 			});
-
 			return { success: true };
 		}),
 
 	/**
-	 * Retrieve pending messages for a peer
+	 * Retrieve messages sent to you via the server fallback.
 	 */
 	getMessages: publicProcedure
 		.input(
 			z.object({
 				peerId: z.string(),
-				count: z.number().optional().default(10),
+				count: z.number().min(1).max(50).default(10),
 			}),
 		)
-		.query(async ({ input }) => {
-			const messages = webrtcManager.getMessages(input.peerId, input.count);
-			return messages;
+		.query(({ input }) => {
+			return webrtcManager.getMessages(input.peerId, input.count);
 		}),
 
 	/**
-	 * Get pending message count
+	 * Get ICE server config (STUN/TURN servers).
+	 * Call this before creating a WebRTC connection.
 	 */
-	getPendingMessageCount: publicProcedure
-		.input(z.object({ peerId: z.string() }))
-		.query(async ({ input }) => {
-			const count = webrtcManager.hasPendingMessages(input.peerId);
-			return { count };
-		}),
-
-	/**
-	 * Get ICE server configuration
-	 */
-	getIceServers: publicProcedure.query(async () => {
-		const servers = webrtcManager.getIceServers();
-		return servers;
+	getIceServers: publicProcedure.query(() => {
+		return webrtcManager.getIceServers();
 	}),
 
 	/**
-	 * Cleanup stale peers (call periodically)
+	 * Clean up stale peers. Call this periodically (e.g. every 10 minutes).
 	 */
 	cleanupStalePeers: publicProcedure
-		.input(z.object({ maxAge: z.number().default(600000) })) // Default: 10 minutes
+		.input(z.object({ maxAge: z.number().default(600_000) }))
 		.mutation(async ({ input }) => {
-			const registry = getPeerRegistry();
+			const registry = getRegistry();
 			const removed = await registry.cleanup(input.maxAge);
-			console.log(`[P2P] Cleaned up ${removed} stale peers`);
 			return { removed };
 		}),
 });

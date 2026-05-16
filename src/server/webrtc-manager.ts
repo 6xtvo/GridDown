@@ -1,140 +1,77 @@
 /**
- * WebRTC Connection Manager - Handles peer connections and signaling
- * Server-side utility for managing WebRTC connections
+ * WebRTC Manager
+ * Queues signals and messages between peers on the server side.
+ * Peers poll for their pending signals/messages via tRPC.
  */
 
 import type { P2PMessage, WebRTCSignal } from "@/server/p2p-types";
 
-export interface PeerConnection {
-	peerId: string;
-	connected: boolean;
-	metadata?: Record<string, unknown>;
-}
+const SIGNAL_TTL = 60_000;  // 1 minute
+const MESSAGE_TTL = 300_000; // 5 minutes
+const MAX_CONNECTIONS = 100;
 
-export interface WebRTCManagerConfig {
-	iceServers?: RTCIceServer[];
-	maxConnections?: number;
-	signalTimeout?: number; // ms
-}
-
-/**
- * Stores pending signals waiting to be picked up by peers
- */
-export class SignalQueue {
-	private queue: Map<string, WebRTCSignal[]> = new Map();
-	private cleanup: Map<string, NodeJS.Timeout> = new Map();
-	private readonly SIGNAL_TTL = 60000; // 1 minute
+class SignalQueue {
+	private queue = new Map<string, WebRTCSignal[]>();
 
 	enqueue(signal: WebRTCSignal): void {
-		const key = signal.to;
+		const existing = this.queue.get(signal.to) ?? [];
+		existing.push(signal);
+		this.queue.set(signal.to, existing);
 
-		if (!this.queue.has(key)) {
-			this.queue.set(key, []);
-		}
-
-		this.queue.get(key)?.push(signal);
-
-		// Set auto-cleanup
-		const existingTimeout = this.cleanup.get(`${signal.from}-${signal.to}`);
-		if (existingTimeout) {
-			clearTimeout(existingTimeout);
-		}
-
-		const timeout = setTimeout(() => {
-			this.dequeueAll(signal.to);
-			this.cleanup.delete(`${signal.from}-${signal.to}`);
-		}, this.SIGNAL_TTL);
-
-		this.cleanup.set(`${signal.from}-${signal.to}`, timeout);
+		// Auto-expire signals
+		setTimeout(() => {
+			const signals = this.queue.get(signal.to);
+			if (!signals) return;
+			const filtered = signals.filter((s) => s.timestamp !== signal.timestamp);
+			if (filtered.length === 0) {
+				this.queue.delete(signal.to);
+			} else {
+				this.queue.set(signal.to, filtered);
+			}
+		}, SIGNAL_TTL);
 	}
 
-	dequeue(
-		peerId: string,
-		filter?: (signal: WebRTCSignal) => boolean,
-	): WebRTCSignal[] {
-		const signals = this.queue.get(peerId) ?? [];
-
-		if (!filter) {
-			this.queue.delete(peerId);
-			return signals;
-		}
-
-		const filtered = signals.filter(filter);
-		const remaining = signals.filter((s) => !filter(s));
-
-		if (remaining.length > 0) {
-			this.queue.set(peerId, remaining);
-		} else {
-			this.queue.delete(peerId);
-		}
-
-		return filtered;
-	}
-
-	dequeueAll(peerId: string): WebRTCSignal[] {
+	dequeue(peerId: string): WebRTCSignal[] {
 		const signals = this.queue.get(peerId) ?? [];
 		this.queue.delete(peerId);
 		return signals;
 	}
 
-	size(): number {
-		let total = 0;
-		for (const signals of this.queue.values()) {
-			total += signals.length;
-		}
-		return total;
-	}
-
 	clear(): void {
 		this.queue.clear();
-		for (const timeout of this.cleanup.values()) {
-			clearTimeout(timeout);
-		}
-		this.cleanup.clear();
 	}
 }
 
-/**
- * In-memory message buffer for peer-to-peer messages
- */
-export class MessageBuffer {
-	private buffer: Map<string, P2PMessage[]> = new Map();
-	private readonly MESSAGE_TTL = 300000; // 5 minutes
+class MessageBuffer {
+	private buffer = new Map<string, P2PMessage[]>();
 
 	enqueue(peerId: string, message: P2PMessage): void {
-		if (!this.buffer.has(peerId)) {
-			this.buffer.set(peerId, []);
-		}
+		const existing = this.buffer.get(peerId) ?? [];
+		existing.push(message);
+		this.buffer.set(peerId, existing);
 
-		this.buffer.get(peerId)?.push(message);
-
-		// Auto cleanup after TTL
+		// Auto-expire messages
 		setTimeout(() => {
-			this.dequeue(peerId, 1); // Remove oldest
-		}, this.MESSAGE_TTL);
+			const messages = this.buffer.get(peerId);
+			if (!messages) return;
+			const filtered = messages.filter((m) => m.timestamp !== message.timestamp);
+			if (filtered.length === 0) {
+				this.buffer.delete(peerId);
+			} else {
+				this.buffer.set(peerId, filtered);
+			}
+		}, MESSAGE_TTL);
 	}
 
-	dequeue(peerId: string, count: number = -1): P2PMessage[] {
+	dequeue(peerId: string, count = 10): P2PMessage[] {
 		const messages = this.buffer.get(peerId) ?? [];
-
-		if (count === -1) {
-			this.buffer.delete(peerId);
-			return messages;
-		}
-
-		const removed = messages.splice(0, Math.min(count, messages.length));
-
+		const taken = messages.splice(0, count);
 		if (messages.length === 0) {
 			this.buffer.delete(peerId);
 		} else {
 			this.buffer.set(peerId, messages);
 		}
-
-		return removed;
-	}
-
-	peek(peerId: string, count: number = 10): P2PMessage[] {
-		return (this.buffer.get(peerId) ?? []).slice(0, count);
+		return taken;
 	}
 
 	pending(peerId: string): number {
@@ -146,112 +83,49 @@ export class MessageBuffer {
 	}
 }
 
-/**
- * WebRTC Manager - Central coordinator for all WebRTC operations
- */
 export class WebRTCManager {
 	private signalQueue = new SignalQueue();
 	private messageBuffer = new MessageBuffer();
-	private connections: Map<string, PeerConnection> = new Map();
-	private config: Required<WebRTCManagerConfig>;
+	private connections = new Map<string, { peerId: string; metadata?: Record<string, unknown> }>();
+	private readonly iceServers: RTCIceServer[] = [
+		{ urls: ["stun:stun.l.google.com:19302"] },
+	];
 
-	constructor(config: WebRTCManagerConfig = {}) {
-		this.config = {
-			iceServers: config.iceServers ?? [
-				{ urls: ["stun:stun.l.google.com:19302"] },
-			],
-			maxConnections: config.maxConnections ?? 100,
-			signalTimeout: config.signalTimeout ?? 30000,
-		};
-	}
-
-	/**
-	 * Queue a WebRTC signal (offer/answer/ICE candidate)
-	 */
 	queueSignal(signal: WebRTCSignal): void {
 		this.signalQueue.enqueue(signal);
 	}
 
-	/**
-	 * Retrieve queued signals for a peer
-	 */
-	getSignals(
-		peerId: string,
-		type?: "offer" | "answer" | "ice-candidate",
-	): WebRTCSignal[] {
-		return this.signalQueue.dequeue(
-			peerId,
-			(signal) => !type || signal.type === type,
-		);
+	getSignals(peerId: string): WebRTCSignal[] {
+		return this.signalQueue.dequeue(peerId);
 	}
 
-	/**
-	 * Store a message for delivery to peer
-	 */
 	storeMessage(peerId: string, message: P2PMessage): void {
 		this.messageBuffer.enqueue(peerId, message);
 	}
 
-	/**
-	 * Retrieve messages for a peer
-	 */
-	getMessages(peerId: string, count?: number): P2PMessage[] {
+	getMessages(peerId: string, count = 10): P2PMessage[] {
 		return this.messageBuffer.dequeue(peerId, count);
 	}
 
-	/**
-	 * Check pending messages count
-	 */
 	hasPendingMessages(peerId: string): number {
 		return this.messageBuffer.pending(peerId);
 	}
 
-	/**
-	 * Register a peer connection
-	 */
 	registerConnection(peerId: string, metadata?: Record<string, unknown>): void {
-		if (this.connections.size >= this.config.maxConnections) {
+		if (this.connections.size >= MAX_CONNECTIONS) {
 			throw new Error("Max connections reached");
 		}
-
-		this.connections.set(peerId, {
-			peerId,
-			connected: true,
-			metadata,
-		});
+		this.connections.set(peerId, { peerId, metadata });
 	}
 
-	/**
-	 * Close a peer connection
-	 */
 	closeConnection(peerId: string): void {
 		this.connections.delete(peerId);
 	}
 
-	/**
-	 * Get all active connections
-	 */
-	getConnections(): PeerConnection[] {
-		return Array.from(this.connections.values());
-	}
-
-	/**
-	 * Get connection count
-	 */
-	getConnectionCount(): number {
-		return this.connections.size;
-	}
-
-	/**
-	 * Get ICE server configuration
-	 */
 	getIceServers(): RTCIceServer[] {
-		return this.config.iceServers;
+		return this.iceServers;
 	}
 
-	/**
-	 * Clear all data
-	 */
 	clear(): void {
 		this.signalQueue.clear();
 		this.messageBuffer.clear();
@@ -259,7 +133,12 @@ export class WebRTCManager {
 	}
 }
 
-/**
- * Create and export singleton instance
- */
-export const webrtcManager = new WebRTCManager();
+// Singleton — persists across hot reloads in Next.js dev
+const globalForWebRTC = globalThis as { __webrtcManager?: WebRTCManager };
+
+export const webrtcManager =
+	globalForWebRTC.__webrtcManager ?? new WebRTCManager();
+
+if (process.env.NODE_ENV !== "production") {
+	globalForWebRTC.__webrtcManager = webrtcManager;
+}
