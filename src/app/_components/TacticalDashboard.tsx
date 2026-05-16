@@ -62,6 +62,7 @@ export type Incident = {
 	loc: string;
 	author: string;
 	time: string;
+	neededBy?: string;
 };
 
 // msgId for exact dedup; image for optional photo attachments
@@ -137,6 +138,7 @@ export function TacticalDashboard() {
 	const [postMsg, setPostMsg] = useState("");
 	const [postType, setPostType] = useState<Incident["type"]>("REQUEST");
 	const [postPriority, setPostPriority] = useState<Incident["priority"]>("MED");
+	const [neededBy, setNeededBy] = useState("");
 	const [postCoord, setPostCoord] = useState<{
 		lat: number;
 		lng: number;
@@ -419,12 +421,14 @@ export function TacticalDashboard() {
 			loc: `${postCoord.lat.toFixed(3)}, ${postCoord.lng.toFixed(3)}`,
 			author: profile?.username ?? "ANON",
 			time: new Date().toLocaleTimeString(),
+			neededBy: postType === "REQUEST" ? neededBy : undefined,
 		};
 		const updated = [newInc, ...incidents];
 		setIncidents(updated);
 		localStorage.setItem("gd_incidents", JSON.stringify(updated));
 		setPostMsg("");
 		setPostCoord(null);
+		setNeededBy("");
 		setPostStep("form");
 	};
 
@@ -628,6 +632,17 @@ export function TacticalDashboard() {
 														{p}
 													</button>
 												))}
+												<div className="mt-2">
+													<input
+														className="w-full bg-transparent px-3 py-2 text-[10px] text-white/70 outline-none"
+														onChange={(e) => setNeededBy(e.target.value)}
+														style={{
+															border: "1px solid rgba(255,255,255,0.07)",
+														}}
+														type="date"
+														value={neededBy}
+													/>
+												</div>
 											</div>
 										)}
 									</div>
@@ -708,6 +723,12 @@ export function TacticalDashboard() {
 													<span className="text-[9px] text-white/15">
 														{inc.time}
 													</span>
+													{inc.neededBy && (
+														<span className="text-[9px] text-amber-400/60">
+															NEEDED BY{" "}
+															{new Date(inc.neededBy).toLocaleDateString()}
+														</span>
+													)}
 													<span className="ml-auto text-[9px] text-white/20">
 														{haversine(base.lat, base.lng, inc.lat, inc.lng)}km
 													</span>
