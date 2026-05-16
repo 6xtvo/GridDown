@@ -51,7 +51,7 @@
 			"enabled": true
 		},
 		"linter": {
-			"enabled": true
+			"enabled": false
 		}
 	},
 	"css": {
@@ -62,7 +62,7 @@
 			"enabled": true
 		},
 		"linter": {
-			"enabled": true
+			"enabled": false
 		},
 		"parser": {
 			"cssModules": true,

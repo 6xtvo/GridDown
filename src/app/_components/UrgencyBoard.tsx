@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import MapGL, { Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { api } from "@/trpc/react";
@@ -298,25 +298,25 @@ export function UrgencyBoard() {
 
 	if (!isMounted)
 		return (
-			<div className="p-8 text-red-500 font-seven">
+			<div className="p-8 font-seven text-red-500">
 				INITIALIZING SECURE CHANNEL...
 			</div>
 		);
 
 	return (
-		<div className="flex flex-col border-2 border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.3)] bg-black text-white">
-			<div className="flex items-center justify-between bg-red-600 px-4 py-2 font-seven text-2xl tracking-wider text-black">
+		<div className="flex flex-col border-2 border-red-600 bg-black text-white shadow-[0_0_15px_rgba(220,38,38,0.3)]">
+			<div className="flex items-center justify-between bg-red-600 px-4 py-2 font-seven text-2xl text-black tracking-wider">
 				<span>LIVE URGENCY BOARD // VOL. 04</span>
-				<div className="flex items-center gap-4 text-sm font-bold">
+				<div className="flex items-center gap-4 font-bold text-sm">
 					<span>OPERATOR: {myPeerId}</span>
 					<span className="animate-pulse">● LIVE NETWORK</span>
 				</div>
 			</div>
 
 			{incomingComms && (
-				<div className="bg-red-950/80 text-white p-4 font-seven flex justify-between items-center border-b-2 border-red-500">
+				<div className="flex items-center justify-between border-red-500 border-b-2 bg-red-950/80 p-4 font-seven text-white">
 					<div>
-						<span className="text-yellow-400 animate-pulse">
+						<span className="animate-pulse text-yellow-400">
 							INCOMING TRANSMISSION INTERCEPTED
 						</span>
 						<br />
@@ -325,11 +325,11 @@ export function UrgencyBoard() {
 						</span>
 					</div>
 					<button
+						className="border-2 border-yellow-400 px-4 py-2 text-yellow-400 tracking-widest transition hover:bg-yellow-400 hover:text-black"
 						onClick={() => {
 							setActiveIncidentId(incomingComms.incidentId);
 							setIncomingComms(null);
 						}}
-						className="border-2 border-yellow-400 text-yellow-400 px-4 py-2 hover:bg-yellow-400 hover:text-black transition tracking-widest"
 					>
 						OPEN SECURE ROOM
 					</button>
@@ -337,15 +337,15 @@ export function UrgencyBoard() {
 			)}
 
 			<div className="flex h-[600px] flex-col lg:flex-row">
-				<div className="flex-1 flex flex-col border-r-2 border-red-600 bg-zinc-950">
+				<div className="flex flex-1 flex-col border-red-600 border-r-2 bg-zinc-950">
 					<form
+						className="border-red-600 border-b bg-zinc-900 p-4"
 						onSubmit={handleReport}
-						className="p-4 border-b border-red-600 bg-zinc-900"
 					>
-						<div className="font-seven text-red-500 mb-2 flex justify-between items-center">
+						<div className="mb-2 flex items-center justify-between font-seven text-red-500">
 							<span>BROADCAST INTEL</span>
 							{!selectedLocation ? (
-								<span className="text-yellow-500 text-sm animate-pulse tracking-widest">
+								<span className="animate-pulse text-sm text-yellow-500 tracking-widest">
 									AWAITING MAP SELECTION...
 								</span>
 							) : (
@@ -357,16 +357,16 @@ export function UrgencyBoard() {
 
 						<div className="flex flex-col gap-2">
 							<input
-								className="bg-black border border-zinc-700 text-white p-2 font-jetbrains text-sm outline-none focus:border-red-500"
+								className="border border-zinc-700 bg-black p-2 font-jetbrains text-sm text-white outline-none focus:border-red-500"
+								onChange={(e) => setNewMsg(e.target.value)}
 								placeholder="Situation description..."
 								value={newMsg}
-								onChange={(e) => setNewMsg(e.target.value)}
 							/>
 							<div className="flex gap-2">
 								<select
-									className="bg-black border border-zinc-700 text-red-400 p-2 font-seven flex-1 outline-none focus:border-red-500"
-									value={newType}
+									className="flex-1 border border-zinc-700 bg-black p-2 font-seven text-red-400 outline-none focus:border-red-500"
 									onChange={(e) => setNewType(e.target.value)}
+									value={newType}
 								>
 									<option value="REQUEST">TYPE: REQUEST</option>
 									<option value="OFFER">TYPE: OFFER</option>
@@ -374,10 +374,10 @@ export function UrgencyBoard() {
 								</select>
 
 								<select
-									className={`bg-black border p-2 font-seven outline-none transition-opacity ${newType === "OFFER" ? "border-zinc-800 text-zinc-600 opacity-50 cursor-not-allowed" : "border-zinc-700 text-red-400 focus:border-red-500"}`}
-									value={newType === "OFFER" ? "LOW" : newPriority}
-									onChange={(e) => setNewPriority(e.target.value)}
+									className={`border bg-black p-2 font-seven outline-none transition-opacity ${newType === "OFFER" ? "cursor-not-allowed border-zinc-800 text-zinc-600 opacity-50" : "border-zinc-700 text-red-400 focus:border-red-500"}`}
 									disabled={newType === "OFFER"}
+									onChange={(e) => setNewPriority(e.target.value)}
+									value={newType === "OFFER" ? "LOW" : newPriority}
 								>
 									<option value="HIGH">PRIORITY: HIGH</option>
 									<option value="MED">PRIORITY: MED</option>
@@ -385,9 +385,9 @@ export function UrgencyBoard() {
 								</select>
 
 								<button
-									type="submit"
+									className="border border-red-600 bg-red-600/20 px-4 font-seven text-red-500 tracking-widest transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
 									disabled={!selectedLocation || !newMsg.trim()}
-									className="bg-red-600/20 border border-red-600 text-red-500 px-4 tracking-widest hover:bg-red-600 hover:text-white font-seven transition disabled:opacity-50 disabled:cursor-not-allowed"
+									type="submit"
 								>
 									TRANSMIT
 								</button>
@@ -395,9 +395,9 @@ export function UrgencyBoard() {
 						</div>
 					</form>
 
-					<div className="flex-1 overflow-y-auto p-4 space-y-4">
+					<div className="flex-1 space-y-4 overflow-y-auto p-4">
 						{activeFeed.length === 0 && (
-							<div className="text-zinc-600 font-seven text-center mt-10 tracking-widest">
+							<div className="mt-10 text-center font-seven text-zinc-600 tracking-widest">
 								NO ACTIVE INCIDENTS ON GRID
 							</div>
 						)}
@@ -408,18 +408,18 @@ export function UrgencyBoard() {
 
 							return (
 								<div
+									className={`group relative cursor-pointer border border-zinc-800 bg-black p-3 transition-colors hover:border-zinc-600 ${activeIncidentId === inc.id ? "border-zinc-500 bg-zinc-900" : ""}`}
 									key={inc.id}
-									className={`border border-zinc-800 bg-black hover:border-zinc-600 p-3 transition-colors cursor-pointer relative group ${activeIncidentId === inc.id ? "bg-zinc-900 border-zinc-500" : ""}`}
 									onClick={() => setActiveIncidentId(inc.id)}
 								>
 									<div
-										className={`absolute left-0 top-0 bottom-0 w-1 ${bgClass}`}
+										className={`absolute top-0 bottom-0 left-0 w-1 ${bgClass}`}
 									></div>
 
 									<div className="flex justify-between font-seven text-xl tracking-wider">
 										<div className="flex items-center gap-3">
 											<span
-												className={`ml-2 px-2 py-0.5 text-xs text-black ${bgClass}`}
+												className={`ml-2 px-2 py-0.5 text-black text-xs ${bgClass}`}
 											>
 												{inc.type}
 											</span>
@@ -438,19 +438,19 @@ export function UrgencyBoard() {
 										<span className="text-zinc-500">{inc.time}</span>
 									</div>
 
-									<p className="text-zinc-300 font-jetbrains text-sm mt-3 leading-relaxed">
+									<p className="mt-3 font-jetbrains text-sm text-zinc-300 leading-relaxed">
 										{inc.msg}
 									</p>
 
-									<div className="mt-3 flex items-center justify-between border-t border-zinc-800 pt-2 font-seven text-xs tracking-widest">
+									<div className="mt-3 flex items-center justify-between border-zinc-800 border-t pt-2 font-seven text-xs tracking-widest">
 										<span className="text-zinc-500">{inc.loc}</span>
 										{inc.peerId === myPeerId ? (
 											<button
+												className="relative z-10 border border-green-600 bg-green-900/30 px-3 py-1 text-green-500 transition hover:bg-green-600 hover:text-black"
 												onClick={(e) => {
 													e.stopPropagation();
 													handleResolve(inc.id);
 												}}
-												className="bg-green-900/30 border border-green-600 text-green-500 px-3 py-1 hover:bg-green-600 hover:text-black transition z-10 relative"
 											>
 												MARK RESOLVED
 											</button>
@@ -462,7 +462,7 @@ export function UrgencyBoard() {
 									</div>
 
 									{/* Now ANYONE can join any room! */}
-									<div className="absolute inset-0 bg-zinc-900/90 hidden group-hover:flex items-center justify-center font-seven text-white text-xl tracking-widest backdrop-blur-sm">
+									<div className="absolute inset-0 hidden items-center justify-center bg-zinc-900/90 font-seven text-white text-xl tracking-widest backdrop-blur-sm group-hover:flex">
 										CLICK TO OPEN SECURE ROOM
 									</div>
 								</div>
@@ -471,55 +471,55 @@ export function UrgencyBoard() {
 					</div>
 				</div>
 
-				<div className="relative flex-1 bg-black overflow-hidden flex flex-col">
+				<div className="relative flex flex-1 flex-col overflow-hidden bg-black">
 					{activeIncidentId ? (
-						<div className="flex flex-col h-full bg-zinc-950 relative z-10">
-							<div className="flex justify-between items-center bg-zinc-900 border-b border-red-600 p-3 font-seven tracking-widest">
+						<div className="relative z-10 flex h-full flex-col bg-zinc-950">
+							<div className="flex items-center justify-between border-red-600 border-b bg-zinc-900 p-3 font-seven tracking-widest">
 								<div>
 									<span className="text-red-500">INCIDENT ROOM SECURED</span>
-									<div className="text-xs text-zinc-500 mt-1">
+									<div className="mt-1 text-xs text-zinc-500">
 										LOC:{" "}
 										{activeIncDetail ? activeIncDetail.loc : "UNKNOWN COORD"}
 									</div>
 								</div>
 								<div className="flex items-center gap-4">
-									<span className="text-green-500 animate-pulse text-sm">
+									<span className="animate-pulse text-green-500 text-sm">
 										LIVE
 									</span>
 									<button
+										className="border border-zinc-700 px-2 py-1 text-xs text-zinc-500 hover:text-white"
 										onClick={() => setActiveIncidentId(null)}
-										className="text-zinc-500 hover:text-white text-xs border border-zinc-700 px-2 py-1"
 									>
 										CLOSE [X]
 									</button>
 								</div>
 							</div>
 
-							<div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 font-jetbrains text-sm">
+							<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 font-jetbrains text-sm">
 								{(chatLogs[activeIncidentId] || []).length === 0 ? (
-									<div className="text-zinc-600 italic font-seven tracking-widest">
+									<div className="font-seven text-zinc-600 italic tracking-widest">
 										ROOM CREATED. AWAITING TRANSMISSIONS...
 									</div>
 								) : (
 									(chatLogs[activeIncidentId] || []).map((msg, idx) => (
 										<div
-											key={idx}
 											className={`${msg.from === myPeerId ? "self-end text-right" : "self-start text-left"} max-w-[80%]`}
+											key={idx}
 										>
 											<span
-												className={`text-[10px] block mb-1 font-seven tracking-widest ${msg.from === myPeerId ? "text-zinc-500" : "text-red-500"}`}
+												className={`mb-1 block font-seven text-[10px] tracking-widest ${msg.from === myPeerId ? "text-zinc-500" : "text-red-500"}`}
 											>
 												{msg.from} [{new Date(msg.time).toLocaleTimeString()}]
 											</span>
 											<div
-												className={`inline-block p-3 border ${msg.from === myPeerId ? "bg-zinc-900 border-zinc-700 text-zinc-300" : "bg-red-950/30 border-red-900 text-red-200"}`}
+												className={`inline-block border p-3 ${msg.from === myPeerId ? "border-zinc-700 bg-zinc-900 text-zinc-300" : "border-red-900 bg-red-950/30 text-red-200"}`}
 											>
 												{msg.text && <p>{msg.text}</p>}
 												{msg.img && (
 													<img
-														src={msg.img}
 														alt="Attachment"
-														className="mt-2 max-w-full h-auto border border-zinc-800 rounded-sm"
+														className="mt-2 h-auto max-w-full rounded-sm border border-zinc-800"
+														src={msg.img}
 													/>
 												)}
 											</div>
@@ -529,48 +529,48 @@ export function UrgencyBoard() {
 								<div ref={chatBottomRef} />
 							</div>
 
-							<div className="p-3 border-t border-red-900 bg-black flex flex-col gap-2">
+							<div className="flex flex-col gap-2 border-red-900 border-t bg-black p-3">
 								{attachedImage && (
-									<div className="relative inline-block self-start border border-zinc-700 p-1 bg-zinc-900">
+									<div className="relative inline-block self-start border border-zinc-700 bg-zinc-900 p-1">
 										<img
-											src={attachedImage}
 											alt="Preview"
 											className="h-16 w-auto opacity-70"
+											src={attachedImage}
 										/>
 										<button
+											className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 font-bold text-black text-xs"
 											onClick={() => setAttachedImage(null)}
-											className="absolute -top-2 -right-2 bg-red-600 text-black font-bold text-xs rounded-full w-5 h-5 flex items-center justify-center"
 										>
 											X
 										</button>
 									</div>
 								)}
-								<form onSubmit={handleSendMessage} className="flex gap-2">
+								<form className="flex gap-2" onSubmit={handleSendMessage}>
 									<input
-										type="file"
 										accept="image/*"
 										className="hidden"
-										ref={fileInputRef}
 										onChange={handleImageUpload}
+										ref={fileInputRef}
+										type="file"
 									/>
 									<button
-										type="button"
+										className="border border-zinc-700 bg-zinc-900 px-3 py-2 font-seven text-zinc-400 tracking-widest hover:text-white"
 										onClick={() => fileInputRef.current?.click()}
-										className="border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-400 hover:text-white font-seven tracking-widest"
+										type="button"
 									>
 										[ATTACH]
 									</button>
 									<input
-										type="text"
-										value={chatInput}
+										className="flex-1 border border-zinc-700 bg-zinc-900 px-4 py-2 font-jetbrains text-green-500 outline-none focus:border-green-500"
 										onChange={(e) => setChatInput(e.target.value)}
 										placeholder="BROADCAST TO ROOM..."
-										className="flex-1 border border-zinc-700 bg-zinc-900 px-4 py-2 text-green-500 outline-none focus:border-green-500 font-jetbrains"
+										type="text"
+										value={chatInput}
 									/>
 									<button
-										type="submit"
+										className="border border-green-600 bg-green-900/20 px-6 py-2 font-seven text-green-500 tracking-widest transition hover:bg-green-600 hover:text-black disabled:opacity-50"
 										disabled={!chatInput.trim() && !attachedImage}
-										className="border border-green-600 bg-green-900/20 px-6 py-2 text-green-500 transition hover:bg-green-600 hover:text-black disabled:opacity-50 font-seven tracking-widest"
+										type="submit"
 									>
 										SEND
 									</button>
@@ -578,17 +578,17 @@ export function UrgencyBoard() {
 							</div>
 						</div>
 					) : (
-						<div className="w-full h-full cursor-crosshair relative">
+						<div className="relative h-full w-full cursor-crosshair">
 							<MapGL
+								attributionControl={false}
 								initialViewState={{
 									longitude: -0.1278,
 									latitude: 51.5074,
 									zoom: 11.5,
 									pitch: 45,
 								}}
-								mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-								attributionControl={false}
 								interactive={true}
+								mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
 								onClick={(e) =>
 									setSelectedLocation({ lat: e.lngLat.lat, lng: e.lngLat.lng })
 								}
@@ -597,23 +597,23 @@ export function UrgencyBoard() {
 									const bgClass = getTypeColor(inc.type).split(" ")[0];
 									return (
 										<Marker
-											key={inc.id}
-											longitude={inc.lng}
-											latitude={inc.lat}
 											anchor="center"
+											key={inc.id}
+											latitude={inc.lat}
+											longitude={inc.lng}
 										>
 											<div
+												className="group relative flex h-8 w-8 cursor-pointer items-center justify-center"
 												onClick={(e) => {
 													e.stopPropagation();
 													setActiveIncidentId(inc.id);
 												}}
-												className="relative flex items-center justify-center w-8 h-8 cursor-pointer group"
 											>
 												<span
-													className={`absolute inline-flex w-full h-full rounded-full opacity-30 animate-ping ${bgClass}`}
+													className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-30 ${bgClass}`}
 												></span>
 												<div
-													className={`relative z-10 w-3 h-3 border border-black transform rotate-45 ${bgClass} ${activeIncidentId === inc.id ? "scale-150 border-white" : ""}`}
+													className={`relative z-10 h-3 w-3 rotate-45 transform border border-black ${bgClass} ${activeIncidentId === inc.id ? "scale-150 border-white" : ""}`}
 												></div>
 											</div>
 										</Marker>
@@ -622,36 +622,36 @@ export function UrgencyBoard() {
 
 								{selectedLocation && (
 									<Marker
-										longitude={selectedLocation.lng}
-										latitude={selectedLocation.lat}
 										anchor="center"
+										latitude={selectedLocation.lat}
+										longitude={selectedLocation.lng}
 									>
-										<div className="relative flex items-center justify-center w-8 h-8">
-											<span className="absolute inline-flex w-full h-full rounded-full bg-green-500 opacity-60 animate-ping"></span>
-											<div className="relative z-10 w-4 h-4 rounded-full border-2 border-green-500 bg-transparent flex items-center justify-center">
-												<div className="w-1 h-1 bg-green-500 rounded-full"></div>
+										<div className="relative flex h-8 w-8 items-center justify-center">
+											<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-60"></span>
+											<div className="relative z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-green-500 bg-transparent">
+												<div className="h-1 w-1 rounded-full bg-green-500"></div>
 											</div>
 										</div>
-										<div className="absolute top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-green-950/80 border border-green-500 px-1 font-seven text-[10px] text-green-500">
+										<div className="absolute top-8 left-1/2 -translate-x-1/2 whitespace-nowrap border border-green-500 bg-green-950/80 px-1 font-seven text-[10px] text-green-500">
 											TARGET_LOCKED
 										</div>
 									</Marker>
 								)}
 							</MapGL>
 
-							<div className="absolute top-4 left-4 bg-black/80 border border-red-600 p-2 font-seven text-sm tracking-widest text-red-500 pointer-events-none z-10">
+							<div className="pointer-events-none absolute top-4 left-4 z-10 border border-red-600 bg-black/80 p-2 font-seven text-red-500 text-sm tracking-widest">
 								SAT_UPLINK: SECURE
 								<br />
 								ACTIVE INCIDENTS: {activeFeed.length}
 							</div>
 
 							{!selectedLocation && (
-								<div className="absolute top-4 right-4 bg-yellow-900/80 border border-yellow-500 p-2 font-seven text-sm tracking-widest text-yellow-500 pointer-events-none animate-pulse z-10">
+								<div className="pointer-events-none absolute top-4 right-4 z-10 animate-pulse border border-yellow-500 bg-yellow-900/80 p-2 font-seven text-sm text-yellow-500 tracking-widest">
 									CLICK MAP TO DESIGNATE COORD
 								</div>
 							)}
 
-							<div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] opacity-40"></div>
+							<div className="pointer-events-none absolute inset-0 bg-[length:100%_4px,3px_100%] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] opacity-40"></div>
 						</div>
 					)}
 				</div>

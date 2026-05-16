@@ -9,11 +9,11 @@ export interface PeerInfo {
 }
 
 export interface WebRTCSignal {
-  from: string;
-  to: string;
-  type: "offer" | "answer" | "ice-candidate";
-  data: Record<string, unknown>;
-  timestamp: number;
+	from: string;
+	to: string;
+	type: "offer" | "answer" | "ice-candidate";
+	data: Record<string, unknown>;
+	timestamp: number;
 }
 
 export interface P2PMessage {

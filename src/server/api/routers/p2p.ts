@@ -26,7 +26,6 @@ function getRegistry(): MemoryPeerRegistry {
 }
 
 export const p2pRouter = createTRPCRouter({
-
 	/**
 	 * Register yourself as an online peer.
 	 * Call this on page load, pass your WebRTC peer ID.

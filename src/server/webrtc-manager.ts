@@ -6,7 +6,7 @@
 
 import type { P2PMessage, WebRTCSignal } from "@/server/p2p-types";
 
-const SIGNAL_TTL = 60_000;  // 1 minute
+const SIGNAL_TTL = 60_000; // 1 minute
 const MESSAGE_TTL = 300_000; // 5 minutes
 const MAX_CONNECTIONS = 100;
 
@@ -54,7 +54,9 @@ class MessageBuffer {
 		setTimeout(() => {
 			const messages = this.buffer.get(peerId);
 			if (!messages) return;
-			const filtered = messages.filter((m) => m.timestamp !== message.timestamp);
+			const filtered = messages.filter(
+				(m) => m.timestamp !== message.timestamp,
+			);
 			if (filtered.length === 0) {
 				this.buffer.delete(peerId);
 			} else {
@@ -86,7 +88,10 @@ class MessageBuffer {
 export class WebRTCManager {
 	private signalQueue = new SignalQueue();
 	private messageBuffer = new MessageBuffer();
-	private connections = new Map<string, { peerId: string; metadata?: Record<string, unknown> }>();
+	private connections = new Map<
+		string,
+		{ peerId: string; metadata?: Record<string, unknown> }
+	>();
 	private readonly iceServers: RTCIceServer[] = [
 		{ urls: ["stun:stun.l.google.com:19302"] },
 	];

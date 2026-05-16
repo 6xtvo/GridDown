@@ -1,5 +1,5 @@
-import { TacticalDashboard } from "@/app/_components/TacticalDashboard"; 
 import { QuickGuide } from "@/app/_components/QuickGuide"; // <-- Import it here
+import { TacticalDashboard } from "@/app/_components/TacticalDashboard";
 import { HydrateClient } from "@/trpc/server";
 
 export default async function Home() {

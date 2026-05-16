@@ -21,7 +21,9 @@ interface NetworkConfig {
 
 class P2PNetwork {
 	private peerId: string | null = null;
-	private iceServers: RTCIceServer[] = [{ urls: ["stun:stun.l.google.com:19302"] }];
+	private iceServers: RTCIceServer[] = [
+		{ urls: ["stun:stun.l.google.com:19302"] },
+	];
 	private sendSignal: SignalSender | null = null;
 
 	private connections = new Map<string, RTCPeerConnection>();
@@ -68,9 +70,12 @@ class P2PNetwork {
 		if (!this.peerId) return;
 		for (const signal of signals) {
 			if (signal.to !== this.peerId) continue;
-			if (signal.type === "offer") void this.handleOffer(signal.from, signal.data);
-			if (signal.type === "answer") void this.handleAnswer(signal.from, signal.data);
-			if (signal.type === "ice-candidate") void this.handleIce(signal.from, signal.data);
+			if (signal.type === "offer")
+				void this.handleOffer(signal.from, signal.data);
+			if (signal.type === "answer")
+				void this.handleAnswer(signal.from, signal.data);
+			if (signal.type === "ice-candidate")
+				void this.handleIce(signal.from, signal.data);
 		}
 	}
 
@@ -108,7 +113,10 @@ class P2PNetwork {
 		this.knownPeers.clear();
 	}
 
-	private ensureConnection(peerId: string, initiator: boolean): RTCPeerConnection | null {
+	private ensureConnection(
+		peerId: string,
+		initiator: boolean,
+	): RTCPeerConnection | null {
 		if (!this.webRtcAvailable) return null;
 
 		const existing = this.connections.get(peerId);
@@ -142,10 +150,12 @@ class P2PNetwork {
 			const channel = conn.createDataChannel("p2p", { ordered: true });
 			this.attachChannel(peerId, channel);
 
-			conn.createOffer()
+			conn
+				.createOffer()
 				.then((offer) => conn.setLocalDescription(offer))
 				.then(() => {
-					if (!this.sendSignal || !this.peerId || !conn.localDescription) return;
+					if (!this.sendSignal || !this.peerId || !conn.localDescription)
+						return;
 					const desc = conn.localDescription;
 					this.sendSignal({
 						from: this.peerId,
@@ -166,9 +176,10 @@ class P2PNetwork {
 		this.channels.set(peerId, channel);
 
 		channel.onmessage = (e) => {
-			const text = e.data instanceof ArrayBuffer
-				? new TextDecoder().decode(e.data)
-				: (e.data as string);
+			const text =
+				e.data instanceof ArrayBuffer
+					? new TextDecoder().decode(e.data)
+					: (e.data as string);
 			try {
 				const msg = JSON.parse(text) as P2PMessage;
 				for (const listener of this.listeners) listener(msg);
@@ -186,26 +197,45 @@ class P2PNetwork {
 		channel.onclose = () => this.channels.delete(peerId);
 	}
 
-	private async handleOffer(from: string, data: Record<string, unknown>): Promise<void> {
+	private async handleOffer(
+		from: string,
+		data: Record<string, unknown>,
+	): Promise<void> {
 		const conn = this.ensureConnection(from, false);
 		if (!conn || !this.peerId) return;
-		await conn.setRemoteDescription(data as unknown as RTCSessionDescriptionInit);
+		await conn.setRemoteDescription(
+			data as unknown as RTCSessionDescriptionInit,
+		);
 		const answer = await conn.createAnswer();
 		await conn.setLocalDescription(answer);
 		if (!this.sendSignal || !conn.localDescription) return;
 		const desc = conn.localDescription;
-		this.sendSignal({ from: this.peerId, to: from, type: "answer", data: { type: desc.type, sdp: desc.sdp }, timestamp: Date.now() });
+		this.sendSignal({
+			from: this.peerId,
+			to: from,
+			type: "answer",
+			data: { type: desc.type, sdp: desc.sdp },
+			timestamp: Date.now(),
+		});
 		this.flushIce(from, conn);
 	}
 
-	private async handleAnswer(from: string, data: Record<string, unknown>): Promise<void> {
+	private async handleAnswer(
+		from: string,
+		data: Record<string, unknown>,
+	): Promise<void> {
 		const conn = this.connections.get(from);
 		if (!conn) return;
-		await conn.setRemoteDescription(data as unknown as RTCSessionDescriptionInit);
+		await conn.setRemoteDescription(
+			data as unknown as RTCSessionDescriptionInit,
+		);
 		this.flushIce(from, conn);
 	}
 
-	private async handleIce(from: string, data: Record<string, unknown>): Promise<void> {
+	private async handleIce(
+		from: string,
+		data: Record<string, unknown>,
+	): Promise<void> {
 		const conn = this.connections.get(from);
 		const candidate = data as RTCIceCandidateInit;
 		if (!conn || !conn.remoteDescription) {

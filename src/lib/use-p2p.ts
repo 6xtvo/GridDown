@@ -12,8 +12,8 @@
 
 import { useEffect, useRef } from "react";
 import { getNetwork } from "@/lib/p2p-network";
-import { api } from "@/trpc/react";
 import type { P2PMessage } from "@/server/p2p-types";
+import { api } from "@/trpc/react";
 
 interface UseP2POptions {
 	peerId: string;
@@ -82,7 +82,6 @@ export function useP2P({ peerId, onMessage }: UseP2POptions) {
 	return {
 		sendToPeer: (targetPeerId: string, message: P2PMessage) =>
 			network.current.sendToPeer(targetPeerId, message),
-		broadcast: (message: P2PMessage) =>
-			network.current.broadcast(message),
+		broadcast: (message: P2PMessage) => network.current.broadcast(message),
 	};
 }

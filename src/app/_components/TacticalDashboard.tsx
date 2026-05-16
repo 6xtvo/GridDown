@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import MapGL, { Layer, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { UrgencyBoard } from "./UrgencyBoard"; 
-import { api } from "@/trpc/react"; 
 import Image from "next/image";
+import { api } from "@/trpc/react";
+import { UrgencyBoard } from "./UrgencyBoard";
 
 // Fallback Default Location (Center of London)
 const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
@@ -54,25 +54,30 @@ export function TacticalDashboard() {
 		lat: number; // <-- Added lat
 		lng: number; // <-- Added lng
 	} | null>(null);
-	
+
 	const [localIncidents, setLocalIncidents] = useState<Incident[]>([]);
 
 	// UI State
 	const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 	const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-	
+
 	// New state to hold HQ coordinates during profile creation
-	const [hqSelect, setHqSelect] = useState<{lat: number, lng: number} | null>(null);
+	const [hqSelect, setHqSelect] = useState<{ lat: number; lng: number } | null>(
+		null,
+	);
 
 	const [hoveredId, setHoveredId] = useState<number | string | null>(null);
-	const [selectedIncidentId, setSelectedIncidentId] = useState<number | string | null>(null);
+	const [selectedIncidentId, setSelectedIncidentId] = useState<
+		number | string | null
+	>(null);
 	const [activeRoute, setActiveRoute] = useState<RouteState | null>(null);
 	const [isRouting, setIsRouting] = useState(false);
 	const [now, setNow] = useState<Date | null>(null);
 
-	const currentBase = profile?.lat && profile?.lng 
-    ? { lat: profile.lat, lng: profile.lng } 
-    : DEFAULT_LOCATION;
+	const currentBase =
+		profile?.lat && profile?.lng
+			? { lat: profile.lat, lng: profile.lng }
+			: DEFAULT_LOCATION;
 
 	// --- P2P Network Hook ---
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -101,10 +106,12 @@ export function TacticalDashboard() {
 		peers.forEach((p) => {
 			const peerIncidents = (p.metadata?.incidents as any[]) || [];
 			peerIncidents.forEach((inc) => {
-				if (!activeFeed.some((existing) => String(existing.id) === String(inc.id))) {
+				if (
+					!activeFeed.some((existing) => String(existing.id) === String(inc.id))
+				) {
 					activeFeed.push({
 						id: inc.id,
-						type: inc.type || "REQUEST", 
+						type: inc.type || "REQUEST",
 						priority: inc.priority,
 						time: inc.time,
 						msg: inc.msg,
@@ -123,18 +130,18 @@ export function TacticalDashboard() {
 	activeFeed.sort((a, b) => {
 		const pA = priorityWeight[a.priority] || 0;
 		const pB = priorityWeight[b.priority] || 0;
-		
+
 		if (pA !== pB) {
 			return pB - pA; // Higher priority first
 		}
 		// If priorities are equal, sort by newest time first
-		return b.time.localeCompare(a.time); 
+		return b.time.localeCompare(a.time);
 	});
 
 	// Form Handlers
 	const handleCreateProfile = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		
+
 		if (!hqSelect) {
 			alert("SYS_ERROR: MUST SET HQ COORDINATES ON MAP");
 			return;
@@ -177,7 +184,8 @@ export function TacticalDashboard() {
 
 	const getTypeColor = (type: string) => {
 		if (type === "OFFER") return "bg-blue-500 text-blue-500 border-blue-500";
-		if (type === "ANNOUNCEMENT") return "bg-emerald-500 text-emerald-500 border-emerald-500";
+		if (type === "ANNOUNCEMENT")
+			return "bg-emerald-500 text-emerald-500 border-emerald-500";
 		return "bg-red-600 text-red-500 border-red-600";
 	};
 
@@ -200,23 +208,23 @@ export function TacticalDashboard() {
 	return (
 		<div className="flex w-full flex-col gap-8">
 			{/* --- TACTICAL NAV --- */}
-			<nav className="flex w-full items-center justify-between border-b-2 border-red-600 bg-black px-8 py-4">
+			<nav className="flex w-full items-center justify-between border-red-600 border-b-2 bg-black px-8 py-4">
 				<div className="flex items-center gap-4">
 					<Image
-						src="/icon.png"
 						alt="GridDown Logo"
-						width={32}
-						height={32}
 						className="opacity-90"
+						height={32}
+						src="/icon.png"
+						width={32}
 					/>
-					<div className="font-sans text-3xl tracking-widest text-red-600">
+					<div className="font-sans text-3xl text-red-600 tracking-widest">
 						GRID<span className="text-white">DOWN</span>
 					</div>
 				</div>
 
 				{!profile ? (
 					<button
-						className="border-2 border-red-600 bg-red-600 px-4 py-2 font-seven text-xl tracking-widest text-black shadow-[0_0_15px_rgba(220,38,38,0.5)] transition hover:bg-black hover:text-red-600"
+						className="border-2 border-red-600 bg-red-600 px-4 py-2 font-seven text-black text-xl tracking-widest shadow-[0_0_15px_rgba(220,38,38,0.5)] transition hover:bg-black hover:text-red-600"
 						onClick={() => setIsProfileModalOpen(true)}
 						type="button"
 					>
@@ -225,7 +233,7 @@ export function TacticalDashboard() {
 				) : (
 					<div className="flex items-center gap-6">
 						<div className="text-right font-seven tracking-widest">
-							<div className="text-lg text-green-500">
+							<div className="text-green-500 text-lg">
 								OP: {profile.username}
 							</div>
 							<div className="text-xs text-zinc-500">
@@ -233,7 +241,7 @@ export function TacticalDashboard() {
 							</div>
 						</div>
 						<button
-							className="border border-red-900 px-4 py-2 font-seven tracking-widest text-red-900 transition-colors hover:border-red-500 hover:text-red-500"
+							className="border border-red-900 px-4 py-2 font-seven text-red-900 tracking-widest transition-colors hover:border-red-500 hover:text-red-500"
 							onClick={() => {
 								localStorage.clear();
 								window.location.reload();
@@ -243,7 +251,7 @@ export function TacticalDashboard() {
 							SYS_RESET
 						</button>
 						<button
-							className="border-2 border-yellow-500 bg-yellow-500 px-6 py-2 font-seven text-2xl tracking-widest text-black shadow-[0_0_15px_rgba(234,179,8,0.4)] transition hover:bg-black hover:text-yellow-500"
+							className="border-2 border-yellow-500 bg-yellow-500 px-6 py-2 font-seven text-2xl text-black tracking-widest shadow-[0_0_15px_rgba(234,179,8,0.4)] transition hover:bg-black hover:text-yellow-500"
 							onClick={() => setIsReportModalOpen(true)}
 							type="button"
 						>
@@ -260,36 +268,36 @@ export function TacticalDashboard() {
 						className="w-full max-w-xl border-2 border-red-600 bg-zinc-950 p-6 shadow-[0_0_30px_rgba(220,38,38,0.3)]"
 						onSubmit={handleCreateProfile}
 					>
-						<h2 className="mb-6 font-seven text-3xl tracking-wider text-red-500">
+						<h2 className="mb-6 font-seven text-3xl text-red-500 tracking-wider">
 							INITIALIZE OPERATOR
 						</h2>
-						
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-jetbrains">
+
+						<div className="grid grid-cols-1 gap-6 font-jetbrains md:grid-cols-2">
 							{/* Form Inputs */}
 							<div className="space-y-4">
 								<div>
-									<label className="text-xs text-red-500/70">
+									<label className="text-red-500/70 text-xs">
 										{"CALLSIGN / USERNAME"}
 									</label>
 									<input
-										className="w-full border border-red-900 bg-black p-2 uppercase text-white focus:border-red-500 focus:outline-none"
+										className="w-full border border-red-900 bg-black p-2 text-white uppercase focus:border-red-500 focus:outline-none"
 										name="username"
 										required
 									/>
 								</div>
 								<div>
-									<label className="text-xs text-red-500/70">
+									<label className="text-red-500/70 text-xs">
 										PROFESSION / SKILLSET
 									</label>
 									<input
-										className="w-full border border-red-900 bg-black p-2 uppercase text-white focus:border-red-500 focus:outline-none"
+										className="w-full border border-red-900 bg-black p-2 text-white uppercase focus:border-red-500 focus:outline-none"
 										name="profession"
 										placeholder="e.g. Medic, Engineer, Scout"
 										required
 									/>
 								</div>
 								<div>
-									<label className="text-xs text-red-500/70">AGE</label>
+									<label className="text-red-500/70 text-xs">AGE</label>
 									<input
 										className="w-full border border-red-900 bg-black p-2 text-white focus:border-red-500 focus:outline-none"
 										name="age"
@@ -301,19 +309,21 @@ export function TacticalDashboard() {
 
 							{/* HQ Map Selector */}
 							<div className="flex flex-col">
-								<label className="text-xs text-red-500/70 mb-1">
+								<label className="mb-1 text-red-500/70 text-xs">
 									SET HQ COORDINATES (CLICK MAP)
 								</label>
-								<div className="relative flex-1 min-h-[160px] border border-red-900 bg-black">
+								<div className="relative min-h-[160px] flex-1 border border-red-900 bg-black">
 									<MapGL
+										attributionControl={false}
 										initialViewState={{
 											longitude: DEFAULT_LOCATION.lng,
 											latitude: DEFAULT_LOCATION.lat,
 											zoom: 10,
 										}}
 										mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-										onClick={(e) => setHqSelect({ lat: e.lngLat.lat, lng: e.lngLat.lng })}
-										attributionControl={false}
+										onClick={(e) =>
+											setHqSelect({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+										}
 									>
 										{hqSelect && (
 											<Marker latitude={hqSelect.lat} longitude={hqSelect.lng}>
@@ -325,14 +335,15 @@ export function TacticalDashboard() {
 										)}
 									</MapGL>
 									{!hqSelect && (
-										<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 font-seven text-xs tracking-widest text-red-500/80">
+										<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 font-seven text-red-500/80 text-xs tracking-widest">
 											AWAITING INPUT...
 										</div>
 									)}
 								</div>
 								{hqSelect && (
 									<div className="mt-1 font-seven text-[10px] text-green-500 tracking-widest">
-										LOCKED: [{hqSelect.lat.toFixed(4)}, {hqSelect.lng.toFixed(4)}]
+										LOCKED: [{hqSelect.lat.toFixed(4)},{" "}
+										{hqSelect.lng.toFixed(4)}]
 									</div>
 								)}
 							</div>
@@ -348,12 +359,12 @@ export function TacticalDashboard() {
 							</button>
 							<button
 								className={`border px-6 py-2 font-seven tracking-widest transition-colors ${
-									hqSelect 
-										? "border-red-600 bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-black" 
-										: "border-red-900 bg-black text-red-900 cursor-not-allowed"
+									hqSelect
+										? "border-red-600 bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-black"
+										: "cursor-not-allowed border-red-900 bg-black text-red-900"
 								}`}
-								type="submit"
 								disabled={!hqSelect}
+								type="submit"
 							>
 								AUTHENTICATE
 							</button>
@@ -364,13 +375,13 @@ export function TacticalDashboard() {
 
 			{isReportModalOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
-					<div className="relative w-full max-w-[95vw] lg:max-w-7xl animate-in fade-in duration-200">
-						<div className="flex justify-between items-end mb-2">
-							<div className="font-seven text-xl tracking-widest text-yellow-500 animate-pulse">
+					<div className="fade-in relative w-full max-w-[95vw] animate-in duration-200 lg:max-w-7xl">
+						<div className="mb-2 flex items-end justify-between">
+							<div className="animate-pulse font-seven text-xl text-yellow-500 tracking-widest">
 								// SECURE P2P UPLINK ESTABLISHED
 							</div>
 							<button
-								className="bg-red-900/20 border border-red-600 px-4 py-1 font-seven text-red-500 transition hover:bg-red-600 hover:text-black"
+								className="border border-red-600 bg-red-900/20 px-4 py-1 font-seven text-red-500 transition hover:bg-red-600 hover:text-black"
 								onClick={() => setIsReportModalOpen(false)}
 								type="button"
 							>
@@ -385,7 +396,7 @@ export function TacticalDashboard() {
 			)}
 
 			{/* --- BACKGROUND LOCAL URGENCY BOARD --- */}
-			<div className="flex flex-col border-2 border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.3)] mx-8">
+			<div className="mx-8 flex flex-col border-2 border-red-600 shadow-[0_0_15px_rgba(220,38,38,0.3)]">
 				<div className="flex flex-col items-center justify-between gap-2 bg-red-600 px-4 py-2 font-seven text-black text-xl tracking-wider md:flex-row">
 					<span className="text-2xl">{"LOCAL URGENCY BOARD // VOL. 04"}</span>
 					<div className="flex w-full items-center justify-between gap-4 border-red-900/30 border-t pt-2 text-sm md:w-auto md:justify-end md:border-t-0 md:pt-0 md:text-lg">
@@ -409,7 +420,7 @@ export function TacticalDashboard() {
 					<div className="flex-1 overflow-y-auto border-red-600 border-b-2 bg-zinc-950 lg:border-r-2 lg:border-b-0">
 						<div className="space-y-4 p-4">
 							{activeFeed.length === 0 && (
-								<div className="flex h-32 items-center justify-center border border-dashed border-zinc-800 text-zinc-600">
+								<div className="flex h-32 items-center justify-center border border-zinc-800 border-dashed text-zinc-600">
 									<p className="font-jetbrains text-xs italic">
 										AWAITING INCOMING TRANSMISSIONS...
 									</p>
@@ -417,33 +428,46 @@ export function TacticalDashboard() {
 							)}
 
 							{activeFeed.map((inc) => {
-								const bgClass = getTypeColor(inc.type).split(' ')[0];
+								const bgClass = getTypeColor(inc.type).split(" ")[0];
 								return (
 									<button
-										className={`relative cursor-pointer w-full border p-3 transition-colors ${selectedIncidentId === inc.id ? "border-green-500 bg-zinc-900/80" : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}
+										className={`relative w-full cursor-pointer border p-3 transition-colors ${selectedIncidentId === inc.id ? "border-green-500 bg-zinc-900/80" : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}
 										key={inc.id}
 										onClick={() => handleMapClick(inc)}
 										onKeyDown={(e) => {
-											if (e.key === "Enter" || e.key === " ") handleMapClick(inc);
+											if (e.key === "Enter" || e.key === " ")
+												handleMapClick(inc);
 										}}
 										tabIndex={0}
 										type="button"
 									>
-										<div className={`absolute bottom-0 left-0 top-0 w-1 ${bgClass}`} />
+										<div
+											className={`absolute top-0 bottom-0 left-0 w-1 ${bgClass}`}
+										/>
 
 										<div className="flex justify-between font-seven text-xl tracking-wider">
 											<div className="flex items-center gap-3">
-												<span className={`ml-2 px-2 py-0.5 text-xs text-black ${bgClass}`}>
+												<span
+													className={`ml-2 px-2 py-0.5 text-black text-xs ${bgClass}`}
+												>
 													{inc.type}
 												</span>
-												<span className={inc.priority === "HIGH" ? "text-red-500" : inc.priority === "MED" ? "text-yellow-500" : "text-zinc-500"}>
+												<span
+													className={
+														inc.priority === "HIGH"
+															? "text-red-500"
+															: inc.priority === "MED"
+																? "text-yellow-500"
+																: "text-zinc-500"
+													}
+												>
 													PRIORITY {inc.type === "OFFER" ? "N/A" : inc.priority}
 												</span>
 											</div>
 											<span className="text-zinc-500">{inc.time}</span>
 										</div>
 
-										<p className="mt-3 font-jetbrains text-sm text-zinc-300 leading-relaxed text-left">
+										<p className="mt-3 text-left font-jetbrains text-sm text-zinc-300 leading-relaxed">
 											{inc.msg}
 										</p>
 
@@ -507,7 +531,7 @@ export function TacticalDashboard() {
 							</Marker>
 
 							{activeFeed.map((inc) => {
-								const bgClass = getTypeColor(inc.type).split(' ')[0];
+								const bgClass = getTypeColor(inc.type).split(" ")[0];
 								return (
 									<Marker
 										anchor="center"
@@ -573,7 +597,7 @@ export function TacticalDashboard() {
 						</div>
 
 						{/* Scanline overlay */}
-						<div className="pointer-events-none absolute inset-0 bg-size-[100%_4px,3px_100%] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] opacity-40" />
+						<div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-size-[100%_4px,3px_100%] opacity-40" />
 					</div>
 				</div>
 			</div>
