@@ -10,7 +10,7 @@ const relayBodySchema = z.discriminatedUnion("type", [
 		type: z.literal("signal"),
 		token: z.string(),
 		signal: z.object({
-				id: z.string().optional(),
+			id: z.string().optional(),
 			from: z.string(),
 			to: z.string(),
 			type: z.enum(["offer", "answer", "ice-candidate"]),
@@ -22,7 +22,7 @@ const relayBodySchema = z.discriminatedUnion("type", [
 		type: z.literal("message"),
 		token: z.string(),
 		message: z.object({
-				id: z.string().optional(),
+			id: z.string().optional(),
 			from: z.string(),
 			to: z.string(),
 			type: z.string(),

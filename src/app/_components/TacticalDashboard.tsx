@@ -336,7 +336,7 @@ export function TacticalDashboard() {
 			const payload = JSON.stringify({
 				type: "INCIDENT_CHAT",
 				// FIX: include msgId in the broadcast payload
-				data: { incidentId: selected, text, msgId },
+				data: { incidentId: selected, text, image: image ?? null, msgId },
 			});
 
 			// FIX: deduplicate peers by peerId before broadcasting
