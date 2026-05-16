@@ -307,7 +307,7 @@ export function TacticalDashboard() {
 
 			<div className="gd flex h-screen flex-col overflow-hidden bg-[#0c0c0c] text-white">
 				{/* ── Header ───────────────────────────────────────── */}
-				<header className="flex flex-shrink-0 items-center justify-between border-b border-white/[0.06] px-6 py-3.5">
+				<header className="flex shrink-0 items-center justify-between border-b border-white/6 px-6 py-3.5">
 					<div className="flex items-center gap-4">
 						<span className="text-base font-medium tracking-widest text-red-500">
 							GRIDDOWN
@@ -351,13 +351,13 @@ export function TacticalDashboard() {
 				{/* ── Body ─────────────────────────────────────────── */}
 				<div className="flex flex-1 overflow-hidden">
 					{/* ── Left: Post + Feed ──────────────────────────── */}
-					<div className="flex w-96 flex-shrink-0 flex-col border-r border-white/[0.06]">
+					<div className="flex w-96 shrink-0 flex-col border-r border-white/6">
 						{/* Post form */}
-						<div className="flex-shrink-0 border-b border-white/[0.06] p-4">
+						<div className="shrink-0 border-b border-white/6 p-4">
 							{postStep === "form" ? (
 								<div className="flex flex-col gap-3">
 									<textarea
-										className="w-full resize-none bg-transparent px-3 py-2.5 text-[11px] leading-relaxed text-white/70 outline-none placeholder:text-white/20 transition-colors focus:bg-white/[0.03]"
+										className="w-full resize-none bg-transparent px-3 py-2.5 text-[11px] leading-relaxed text-white/70 outline-none placeholder:text-white/20 transition-colors focus:bg-white/3"
 										onChange={(e) => setPostMsg(e.target.value)}
 										placeholder="Describe the situation..."
 										rows={2}
@@ -466,7 +466,7 @@ export function TacticalDashboard() {
 							)}
 							{feed.map((inc, i) => (
 								<div
-									className={`gd-row gd-in border-b border-white/[0.04] ${selected === inc.id ? "active" : ""}`}
+									className={`gd-row gd-in border-b border-white/4 ${selected === inc.id ? "active" : ""}`}
 									key={inc.id}
 									onClick={() => handleSelect(inc)}
 									style={{ animationDelay: `${i * 25}ms` }}
@@ -474,13 +474,13 @@ export function TacticalDashboard() {
 									<div className="px-4 py-3.5">
 										<div className="flex items-start gap-2.5">
 											<span
-												className="mt-[5px] h-1.5 w-1.5 flex-shrink-0 rounded-full"
+												className="mt-1.25 h-1.5 w-1.5 shrink-0 rounded-full"
 												style={{ background: PRIORITY_DOT[inc.priority] }}
 											/>
 											<div className="min-w-0 flex-1">
 												<div className="mb-1 flex items-center gap-2">
 													<span
-														className="flex-shrink-0 text-[9px] tracking-widest"
+														className="shrink-0 text-[9px] tracking-widest"
 														style={{ color: TYPE_COLOR[inc.type] + "bb" }}
 													>
 														{TYPE_LABEL[inc.type]}
@@ -558,7 +558,7 @@ export function TacticalDashboard() {
 						{rightPanel === "chat" && selectedInc ? (
 							/* Chat */
 							<div className="flex h-full flex-col">
-								<div className="flex flex-shrink-0 items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+								<div className="flex shrink-0 items-center justify-between border-b border-white/6 px-5 py-3.5">
 									<div>
 										<div className="flex items-center gap-2.5">
 											<span
@@ -623,11 +623,11 @@ export function TacticalDashboard() {
 								</div>
 
 								<form
-									className="flex flex-shrink-0 items-center gap-2 border-t border-white/[0.06] p-3"
+									className="flex shrink-0 items-center gap-2 border-t border-white/6 p-3"
 									onSubmit={handleSendChat}
 								>
 									<input
-										className="flex-1 bg-transparent px-3 py-2.5 text-[11px] text-white/70 outline-none placeholder:text-white/20 transition-colors focus:bg-white/[0.03]"
+										className="flex-1 bg-transparent px-3 py-2.5 text-[11px] text-white/70 outline-none placeholder:text-white/20 transition-colors focus:bg-white/3"
 										onChange={(e) => setChatInput(e.target.value)}
 										placeholder="Send a message..."
 										style={{ border: "1px solid rgba(255,255,255,0.07)" }}
@@ -874,7 +874,7 @@ export function TacticalDashboard() {
 										{f.label}
 									</label>
 									<input
-										className="w-full bg-transparent px-3 py-2.5 text-[12px] text-white/75 outline-none placeholder:text-white/15 transition-colors focus:bg-white/[0.03]"
+										className="w-full bg-transparent px-3 py-2.5 text-[12px] text-white/75 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
 										name={f.name}
 										placeholder={f.placeholder}
 										required
