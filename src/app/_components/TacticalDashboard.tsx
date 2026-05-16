@@ -298,7 +298,13 @@ export function TacticalDashboard() {
 		});
 	}
 	const w: Record<string, number> = { HIGH: 3, MED: 2, LOW: 1 };
-	feed.sort((a, b) => (w[b.priority] ?? 0) - (w[a.priority] ?? 0));
+	feed.sort((a, b) => {
+		const pDiff = (w[b.priority] ?? 0) - (w[a.priority] ?? 0);
+		if (pDiff !== 0) return pDiff;
+		const distA = parseFloat(haversine(base.lat, base.lng, a.lat, a.lng));
+		const distB = parseFloat(haversine(base.lat, base.lng, b.lat, b.lng));
+		return distA - distB;
+	});
 
 	const selectedInc = feed.find((i) => i.id === selected) ?? null;
 	const activeChat = selected ? (chatLogs[selected] ?? []) : [];
