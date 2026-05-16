@@ -126,14 +126,14 @@ export function QuickGuide() {
 							}}
 						>
 							<div className="flex items-center gap-3">
-								<span className="relative flex h-2 w-2">
+								<span className="relative flex h-2 w-2 items-center justify-center">
 									<span
-										className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-70"
+										className="absolute h-full w-full rounded-full bg-red-500 opacity-70"
 										style={{
 											animation: "qg-ping 1.8s cubic-bezier(0,0,.2,1) infinite",
 										}}
 									/>
-									<span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-400" />
+									<span className="relative h-1.5 w-1.5 rounded-full bg-red-400" />
 								</span>
 								<span className="text-[11px] tracking-[0.32em] text-red-400">
 									GUIDE
