@@ -65,7 +65,13 @@ export type Incident = {
 };
 
 // msgId for exact dedup; image for optional photo attachments
-type ChatMsg = { from: string; image?: string | null; text: string; time: number; msgId: string };
+type ChatMsg = {
+	from: string;
+	image?: string | null;
+	text: string;
+	time: number;
+	msgId: string;
+};
 type RouteState = { geojson: GeoJSON.LineString; eta: number };
 
 const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
@@ -223,7 +229,10 @@ export function TacticalDashboard() {
 			peers
 				.filter((p) => p.peerId !== profile.username)
 				.forEach((p) => {
-					const peerChats = (p.metadata?.chatLogs ?? {}) as Record<string, ChatMsg[]>;
+					const peerChats = (p.metadata?.chatLogs ?? {}) as Record<
+						string,
+						ChatMsg[]
+					>;
 					Object.entries(peerChats).forEach(([roomId, msgs]) => {
 						const room: ChatMsg[] = merged[roomId] ?? [];
 						const dedupedRoom = [...room];
@@ -322,8 +331,8 @@ export function TacticalDashboard() {
 			localStorage.setItem("gd_chats", JSON.stringify(updated));
 			return updated;
 		});
-		// Broadcast text only (images are too large for p2p payload)
-		if (peers && text) {
+
+		if (peers && (text || image)) {
 			const payload = JSON.stringify({
 				type: "INCIDENT_CHAT",
 				// FIX: include msgId in the broadcast payload
@@ -333,7 +342,9 @@ export function TacticalDashboard() {
 			// FIX: deduplicate peers by peerId before broadcasting
 			const uniquePeers = peers
 				.filter((p) => p.peerId !== profile.username)
-				.filter((p, i, arr) => arr.findIndex((x) => x.peerId === p.peerId) === i);
+				.filter(
+					(p, i, arr) => arr.findIndex((x) => x.peerId === p.peerId) === i,
+				);
 
 			await Promise.all(
 				uniquePeers.map((p) =>
