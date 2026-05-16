@@ -312,7 +312,7 @@ export function TacticalDashboard() {
 								<label className="mb-1 text-red-500/70 text-xs">
 									SET HQ COORDINATES (CLICK MAP)
 								</label>
-								<div className="relative min-h-[160px] flex-1 border border-red-900 bg-black">
+								<div className="relative min-h-40 flex-1 border border-red-900 bg-black">
 									<MapGL
 										attributionControl={false}
 										initialViewState={{
@@ -415,7 +415,7 @@ export function TacticalDashboard() {
 					</div>
 				</div>
 
-				<div className="flex h-[600px] flex-col lg:flex-row">
+				<div className="flex h-150 flex-col lg:flex-row">
 					{/* Main Feed */}
 					<div className="flex-1 overflow-y-auto border-red-600 border-b-2 bg-zinc-950 lg:border-r-2 lg:border-b-0">
 						<div className="space-y-4 p-4">

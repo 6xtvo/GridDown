@@ -6,7 +6,7 @@ export function QuickGuide() {
 	const [isOpen, setIsOpen] = useState(false);
 
 	return (
-		<div className="fixed right-6 bottom-6 z-[100] flex flex-col items-end">
+		<div className="fixed right-6 bottom-6 z-100 flex flex-col items-end">
 			{/* Guide Window */}
 			{isOpen && (
 				<div className="fade-in slide-in-from-bottom-4 mb-4 w-80 animate-in border-2 border-red-600 bg-black/95 p-5 shadow-[0_0_20px_rgba(220,38,38,0.3)] backdrop-blur-md lg:w-96">
@@ -54,7 +54,7 @@ export function QuickGuide() {
 					</div>
 
 					{/* Decorative Scanline */}
-					<div className="pointer-events-none absolute inset-0 bg-[length:100%_4px,3px_100%] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] opacity-20"></div>
+					<div className="pointer-events-none absolute inset-0 bg-size-[100%_4px,3px_100%] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] opacity-20"></div>
 				</div>
 			)}
 

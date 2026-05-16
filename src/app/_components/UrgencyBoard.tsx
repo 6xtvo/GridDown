@@ -336,7 +336,7 @@ export function UrgencyBoard() {
 				</div>
 			)}
 
-			<div className="flex h-[600px] flex-col lg:flex-row">
+			<div className="flex h-150 flex-col lg:flex-row">
 				<div className="flex flex-1 flex-col border-red-600 border-r-2 bg-zinc-950">
 					<form
 						className="border-red-600 border-b bg-zinc-900 p-4"
@@ -651,7 +651,7 @@ export function UrgencyBoard() {
 								</div>
 							)}
 
-							<div className="pointer-events-none absolute inset-0 bg-[length:100%_4px,3px_100%] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] opacity-40"></div>
+							<div className="pointer-events-none absolute inset-0 bg-size-[100%_4px,3px_100%] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] opacity-40"></div>
 						</div>
 					)}
 				</div>
