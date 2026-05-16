@@ -13,16 +13,24 @@ const MAX_CONNECTIONS = 100;
 class SignalQueue {
 	private queue = new Map<string, WebRTCSignal[]>();
 
+	private ensureId(signal: WebRTCSignal): WebRTCSignal {
+		return {
+			...signal,
+			id: signal.id ?? crypto.randomUUID(),
+		};
+	}
+
 	enqueue(signal: WebRTCSignal): void {
+		const storedSignal = this.ensureId(signal);
 		const existing = this.queue.get(signal.to) ?? [];
-		existing.push(signal);
+		existing.push(storedSignal);
 		this.queue.set(signal.to, existing);
 
 		// Auto-expire signals
 		setTimeout(() => {
 			const signals = this.queue.get(signal.to);
 			if (!signals) return;
-			const filtered = signals.filter((s) => s.timestamp !== signal.timestamp);
+			const filtered = signals.filter((s) => s.id !== storedSignal.id);
 			if (filtered.length === 0) {
 				this.queue.delete(signal.to);
 			} else {
@@ -45,18 +53,24 @@ class SignalQueue {
 class MessageBuffer {
 	private buffer = new Map<string, P2PMessage[]>();
 
+	private ensureId(message: P2PMessage): P2PMessage {
+		return {
+			...message,
+			id: message.id ?? crypto.randomUUID(),
+		};
+	}
+
 	enqueue(peerId: string, message: P2PMessage): void {
+		const storedMessage = this.ensureId(message);
 		const existing = this.buffer.get(peerId) ?? [];
-		existing.push(message);
+		existing.push(storedMessage);
 		this.buffer.set(peerId, existing);
 
 		// Auto-expire messages
 		setTimeout(() => {
 			const messages = this.buffer.get(peerId);
 			if (!messages) return;
-			const filtered = messages.filter(
-				(m) => m.timestamp !== message.timestamp,
-			);
+			const filtered = messages.filter((m) => m.id !== storedMessage.id);
 			if (filtered.length === 0) {
 				this.buffer.delete(peerId);
 			} else {

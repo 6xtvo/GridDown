@@ -64,7 +64,7 @@ export type Incident = {
 	time: string;
 };
 
-type ChatMsg = { from: string; text: string; time: number };
+type ChatMsg = { id: string; from: string; text: string; time: number };
 type RouteState = { geojson: GeoJSON.LineString; eta: number };
 
 const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
@@ -133,6 +133,17 @@ export function TacticalDashboard() {
 	} | null>(null);
 	const [postStep, setPostStep] = useState<"form" | "map">("form");
 
+	const normalizeChatLogs = (logs: Record<string, ChatMsg[]>) =>
+		Object.fromEntries(
+			Object.entries(logs).map(([room, messages]) => [
+				room,
+				messages.map((message, index) => ({
+					...message,
+					id: message.id ?? `${room}:${message.time}:${index}`,
+				})),
+			]),
+		) as Record<string, ChatMsg[]>;
+
 	const base = profile ?? DEFAULT_LOCATION;
 
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -142,7 +153,7 @@ export function TacticalDashboard() {
 	const register = api.p2p.register.useMutation();
 	const sendMessage = api.p2p.sendMessage.useMutation();
 	const { data: incomingMessages } = api.p2p.getMessages.useQuery(
-		{ peerId: profile?.username ?? "" },
+		{ peerId: profile?.username ?? "", count: 100 },
 		{ refetchInterval: 2000, enabled: mounted && !!profile },
 	);
 
@@ -154,7 +165,7 @@ export function TacticalDashboard() {
 		const savedInc = localStorage.getItem("gd_incidents");
 		if (savedInc) setIncidents(JSON.parse(savedInc));
 		const savedChat = localStorage.getItem("gd_chats");
-		if (savedChat) setChatLogs(JSON.parse(savedChat));
+		if (savedChat) setChatLogs(normalizeChatLogs(JSON.parse(savedChat)));
 	}, []);
 
 	useEffect(() => {
@@ -176,7 +187,7 @@ export function TacticalDashboard() {
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
 		setChatLogs((prev) => {
-			const updated = { ...prev };
+			const updated = normalizeChatLogs({ ...prev });
 			let changed = false;
 			incomingMessages.forEach((m) => {
 				try {
@@ -184,8 +195,10 @@ export function TacticalDashboard() {
 					if (p.type !== "INCIDENT_CHAT") return;
 					const room = p.data.incidentId as string;
 					if (!updated[room]) updated[room] = [];
-					if (!updated[room].some((x) => x.time === m.timestamp)) {
+					const messageId = m.id ?? `${room}:${m.timestamp}:${m.from}:${p.data.text}`;
+					if (!updated[room].some((x) => x.id === messageId)) {
 						updated[room].push({
+							id: messageId,
 							from: m.from,
 							text: p.data.text,
 							time: m.timestamp,
@@ -262,12 +275,16 @@ export function TacticalDashboard() {
 		const text = chatInput.trim();
 		setChatInput("");
 		const now = Date.now();
+		const id = crypto.randomUUID();
 		setChatLogs((prev) => {
 			const updated = {
-				...prev,
+				...normalizeChatLogs(prev),
 				[selected]: [
-					...(prev[selected] ?? []),
-					{ from: profile.username, text, time: now },
+					...((prev[selected] ?? []).map((message) => ({
+						...message,
+						id: message.id ?? `${selected}:${message.time}`,
+					}))),
+					{ id, from: profile.username, text, time: now },
 				],
 			};
 			localStorage.setItem("gd_chats", JSON.stringify(updated));
@@ -690,7 +707,7 @@ export function TacticalDashboard() {
 										return (
 											<div
 												className={`gd-in flex flex-col ${isMe ? "items-end" : "items-start"}`}
-												key={idx}
+												key={msg.id}
 											>
 												<span className="mb-1 text-[9px] text-white/25">
 													{msg.from} · {new Date(msg.time).toLocaleTimeString()}

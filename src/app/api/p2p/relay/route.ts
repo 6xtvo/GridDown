@@ -10,6 +10,7 @@ const relayBodySchema = z.discriminatedUnion("type", [
 		type: z.literal("signal"),
 		token: z.string(),
 		signal: z.object({
+				id: z.string().optional(),
 			from: z.string(),
 			to: z.string(),
 			type: z.enum(["offer", "answer", "ice-candidate"]),
@@ -21,6 +22,7 @@ const relayBodySchema = z.discriminatedUnion("type", [
 		type: z.literal("message"),
 		token: z.string(),
 		message: z.object({
+				id: z.string().optional(),
 			from: z.string(),
 			to: z.string(),
 			type: z.string(),
@@ -41,11 +43,14 @@ export async function POST(req: Request) {
 	}
 
 	if (parsed.data.type === "signal") {
+		parsed.data.signal.id ??= crypto.randomUUID();
 		webrtcManager.queueSignal(parsed.data.signal);
 		return NextResponse.json({ success: true });
 	}
 
+	parsed.data.message.id ??= crypto.randomUUID();
 	webrtcManager.storeMessage(parsed.data.message.to, {
+		id: parsed.data.message.id,
 		from: parsed.data.message.from,
 		type: parsed.data.message.type,
 		data: parsed.data.message.data,

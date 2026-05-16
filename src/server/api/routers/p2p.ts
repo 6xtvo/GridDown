@@ -98,6 +98,7 @@ export const p2pRouter = createTRPCRouter({
 		)
 		.mutation(async ({ input }) => {
 			const signal = {
+				id: crypto.randomUUID(),
 				from: input.from,
 				to: input.to,
 				type: input.type,
@@ -139,6 +140,7 @@ export const p2pRouter = createTRPCRouter({
 		)
 		.mutation(async ({ input }) => {
 			const message = {
+				id: crypto.randomUUID(),
 				from: input.from,
 				to: input.to,
 				type: input.type,
@@ -167,7 +169,7 @@ export const p2pRouter = createTRPCRouter({
 		.input(
 			z.object({
 				peerId: z.string(),
-				count: z.number().min(1).max(50).default(10),
+				count: z.number().min(1).max(200).default(100),
 			}),
 		)
 		.query(({ input }) => {
