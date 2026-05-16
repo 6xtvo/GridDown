@@ -64,12 +64,8 @@ export type Incident = {
 	time: string;
 };
 
-type ChatMsg = {
-	from: string;
-	text: string;
-	image?: string | null;
-	time: number;
-};
+// msgId for exact dedup; image for optional photo attachments
+type ChatMsg = { from: string; text: string; time: number; msgId: string; image?: string };
 type RouteState = { geojson: GeoJSON.LineString; eta: number };
 
 const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
@@ -141,6 +137,12 @@ export function TacticalDashboard() {
 	} | null>(null);
 	const [postStep, setPostStep] = useState<"form" | "map">("form");
 
+	const [obUsername, setObUsername] = useState("");
+	const [obAge, setObAge] = useState("");
+	const [obSkills, setObSkills] = useState<Skill[]>([]);
+	const [obErrors, setObErrors] = useState<ProfileErrors>({});
+	const [skillSearch, setSkillSearch] = useState("");
+
 	const base = profile ?? DEFAULT_LOCATION;
 
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -167,19 +169,13 @@ export function TacticalDashboard() {
 
 	useEffect(() => {
 		if (!mounted || !profile) return;
-		const publishPresence = () => {
-			register.mutate({
-				peerId: profile.username,
-				ip: "client",
-				metadata: { incidents },
-			});
-		};
-
-		publishPresence();
-		const intervalId = window.setInterval(publishPresence, 5000);
-		return () => window.clearInterval(intervalId);
+		register.mutate({
+			peerId: profile.username,
+			ip: "client",
+			metadata: { incidents, chatLogs },
+		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [incidents, profile]);
+	}, [incidents, chatLogs, profile]);
 
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
@@ -187,16 +183,22 @@ export function TacticalDashboard() {
 			const updated = { ...prev };
 			let changed = false;
 			incomingMessages.forEach((m) => {
+				// skip messages we sent ourselves — already in local state
+				if (m.from === profile.username) return;
 				try {
 					const p = JSON.parse(String(m.data));
 					if (p.type !== "INCIDENT_CHAT") return;
 					const room = p.data.incidentId as string;
+					const msgId = p.data.msgId as string;
 					if (!updated[room]) updated[room] = [];
-					if (!updated[room].some((x) => x.time === m.timestamp)) {
+					// deduplicate by msgId
+					if (!updated[room].some((x) => x.msgId === msgId)) {
 						updated[room].push({
 							from: m.from,
 							text: p.data.text,
+							image: p.data.image,
 							time: m.timestamp,
+							msgId,
 						});
 						changed = true;
 					}
@@ -211,6 +213,37 @@ export function TacticalDashboard() {
 			return prev;
 		});
 	}, [incomingMessages, profile]);
+
+	// Merge chat history from peer metadata; skip self to avoid duplicates
+	useEffect(() => {
+		if (!peers || !profile) return;
+		setChatLogs((prev) => {
+			let changed = false;
+			const merged = { ...prev };
+			peers
+				.filter((p) => p.peerId !== profile.username)
+				.forEach((p) => {
+					const peerChats = (p.metadata?.chatLogs ?? {}) as Record<string, ChatMsg[]>;
+					Object.entries(peerChats).forEach(([roomId, msgs]) => {
+						const room: ChatMsg[] = merged[roomId] ?? [];
+						const dedupedRoom = [...room];
+						msgs.forEach((msg) => {
+							// deduplicate by msgId
+							if (!dedupedRoom.some((x) => x.msgId === msg.msgId)) {
+								dedupedRoom.push(msg);
+								changed = true;
+							}
+						});
+						merged[roomId] = dedupedRoom;
+					});
+				});
+			if (changed) {
+				localStorage.setItem("gd_chats", JSON.stringify(merged));
+				return merged;
+			}
+			return prev;
+		});
+	}, [peers, profile]);
 
 	useEffect(() => {
 		chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -270,41 +303,47 @@ export function TacticalDashboard() {
 		if (!chatInput.trim() && !chatImage) return;
 
 		const text = chatInput.trim();
-		const image = chatImage;
-		setChatInput("");
-		setChatImage(null);
+		const image = chatImage ?? undefined;
+		// generate unique msgId for exact deduplication across all effects
+		const msgId = Math.random().toString(36).slice(2, 11);
 		const now = Date.now();
 
-		// Always save locally with image
+		setChatInput("");
+		setChatImage(null);
+
+		// add to local state immediately
 		setChatLogs((prev) => {
 			const updated = {
 				...prev,
 				[selected]: [
 					...(prev[selected] ?? []),
-					{ from: profile.username, text, image, time: now },
+					{ from: profile.username, text, image, time: now, msgId },
 				],
 			};
 			localStorage.setItem("gd_chats", JSON.stringify(updated));
 			return updated;
 		});
 
-		// Broadcast text only (images are too large for p2p payload)
-		if (peers && text) {
+		if (peers) {
 			const payload = JSON.stringify({
 				type: "INCIDENT_CHAT",
-				data: { incidentId: selected, text },
+				data: { incidentId: selected, text, image, msgId },
 			});
+
+			// deduplicate peers by peerId before broadcasting
+			const uniquePeers = peers
+				.filter((p) => p.peerId !== profile.username)
+				.filter((p, i, arr) => arr.findIndex((x) => x.peerId === p.peerId) === i);
+
 			await Promise.all(
-				peers
-					.filter((p) => p.peerId !== profile.username)
-					.map((p) =>
-						sendMessage.mutateAsync({
-							from: profile.username,
-							to: p.peerId,
-							type: "DIRECT_MESSAGE",
-							data: payload,
-						}),
-					),
+				uniquePeers.map((p) =>
+					sendMessage.mutateAsync({
+						from: profile.username,
+						to: p.peerId,
+						type: "DIRECT_MESSAGE",
+						data: payload,
+					}),
+				),
 			);
 		}
 	};
@@ -332,24 +371,20 @@ export function TacticalDashboard() {
 	};
 
 	const handleResolve = (id: string) => {
-		const updated = incidents.filter((i) => i.id !== id);
-		setIncidents(updated);
-		localStorage.setItem("gd_incidents", JSON.stringify(updated));
-		if (selected === id) {
-			setSelected(null);
-			setRoute(null);
-			setRightPanel("map");
-		}
+		const remaining = incidents.filter((i) => i.id !== id);
+		setIncidents(remaining);
+		localStorage.setItem("gd_incidents", JSON.stringify(remaining));
+		setSelected(null);
+		setRoute(null);
+		setRightPanel("map");
+		setChatLogs((prev) => {
+			const withoutResolved = { ...prev };
+			delete withoutResolved[id];
+			localStorage.setItem("gd_chats", JSON.stringify(withoutResolved));
+			return withoutResolved;
+		});
 	};
 
-	// ── Add to component state (alongside existing useState calls) ──────────────
-	const [obUsername, setObUsername] = useState("");
-	const [obAge, setObAge] = useState("");
-	const [obSkills, setObSkills] = useState<Skill[]>([]);
-	const [obErrors, setObErrors] = useState<ProfileErrors>({});
-	const [skillSearch, setSkillSearch] = useState("");
-
-	// ── Replace handleSaveProfile ────────────────────────────────────────────────
 	const handleSaveProfile = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!hqDraft) return;
@@ -381,6 +416,7 @@ export function TacticalDashboard() {
 		localStorage.setItem("gd_profile", JSON.stringify(p));
 		setShowOnboard(false);
 	};
+
 	if (!mounted) return null;
 
 	return (
@@ -411,7 +447,7 @@ export function TacticalDashboard() {
 							</span>
 						</div>
 
-						{/* ── new stat chips ── */}
+						{/* ── stat chips ── */}
 						<div className="h-3 w-px bg-white/8" />
 						<div className="flex items-center gap-1.5">
 							<span
@@ -440,6 +476,15 @@ export function TacticalDashboard() {
 									{" · "}
 									{profile.role}
 								</span>
+								<button
+									className="text-[10px] tracking-widest text-white/20 transition-colors hover:text-red-500"
+									onClick={() => {
+										localStorage.removeItem("gd_profile");
+										window.location.reload();
+									}}
+								>
+									RESET
+								</button>
 							</>
 						) : (
 							<button
