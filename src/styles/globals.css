@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-    /* Set JetBrains as your default standard font */
-    --font-sans: var(--font-jetbrains-custom), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-    
-    /* Create the 'font-jetbrains' utility class explicitly */
-    --font-jetbrains: var(--font-jetbrains-custom), ui-monospace, monospace;
+	/* Set JetBrains as your default standard font */
+	--font-sans:
+		var(--font-jetbrains-custom), ui-sans-serif, system-ui, sans-serif,
+		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
-    /* Create the 'font-seven' utility class for your custom local font */
-    --font-seven: var(--font-seven-custom), ui-monospace, monospace;
+	/* Create the 'font-jetbrains' utility class explicitly */
+	--font-jetbrains: var(--font-jetbrains-custom), ui-monospace, monospace;
+
+	/* Create the 'font-seven' utility class for your custom local font */
+	--font-seven: var(--font-seven-custom), ui-monospace, monospace;
 }
