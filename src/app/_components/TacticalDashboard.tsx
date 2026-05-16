@@ -1108,7 +1108,7 @@ export function TacticalDashboard() {
 							OPERATOR PROFILE
 						</h2>
 						<p className="mb-6 text-[10px] text-white/25">
-							Set your callsign to join the mesh.
+							Set your name to join the mesh.
 						</p>
 
 						<div className="flex flex-col gap-5">
@@ -1250,7 +1250,7 @@ export function TacticalDashboard() {
 							{/* ── HQ map ── */}
 							<div>
 								<label className="mb-1.5 block text-[9px] tracking-[0.25em] text-white/30">
-									HQ LOCATION <span className="text-white/15">(click map)</span>
+									LOCATION <span className="text-white/15">(click map)</span>
 								</label>
 								<div
 									className="relative overflow-hidden"

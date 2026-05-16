@@ -13,7 +13,7 @@ const STEPS = [
 		bgClass: "bg-red-500/5",
 		dot: "bg-red-500",
 		description:
-			'Authenticate your callsign and skillset on the local node. Hit "CREATE PROFILE" in the nav to initialize your operator identity and set your HQ coordinates on the map.',
+			'Authenticate your name and skillset on the local node. Hit "CREATE PROFILE" in the nav to initialize your identity and set your location on the map.',
 	},
 	{
 		num: "02",
@@ -25,11 +25,11 @@ const STEPS = [
 		bgClass: "bg-green-500/5",
 		dot: "bg-green-500",
 		description:
-			"Click any incident in the feed or tap a marker to lock target coordinates and auto-calculate your drive route + ETA from HQ base.",
+			"Click any incident in the feed or tap a marker to lock target coordinates and auto-calculate your drive route + ETA from your location.",
 	},
 	{
 		num: "03",
-		label: "ACCESS SYSTEM",
+		label: "POST",
 		color: "#eab308",
 		glowColor: "rgba(234,179,8,0.35)",
 		textClass: "text-yellow-400",
@@ -37,11 +37,11 @@ const STEPS = [
 		bgClass: "bg-yellow-500/5",
 		dot: "bg-yellow-400",
 		description:
-			'Open the live P2P network via "ACCESS SYSTEM". Click the map to designate target coordinates, then transmit a Request, Offer, or Announcement to the swarm.',
+			'Open the live P2P network via "POST". Click the map to designate target coordinates, then post a Request, Offer, or Announcement to the network.',
 	},
 	{
 		num: "04",
-		label: "SECURE COMMS",
+		label: "CHAT",
 		color: "#3b82f6",
 		glowColor: "rgba(59,130,246,0.35)",
 		textClass: "text-blue-400",
@@ -49,7 +49,7 @@ const STEPS = [
 		bgClass: "bg-blue-500/5",
 		dot: "bg-blue-400",
 		description:
-			"Tap any active incident card in the Urgency Board to join its encrypted chat room. Broadcast text and image attachments to all connected operators.",
+			"Tap any active incident card in the Urgency Board to join its encrypted chat room. Broadcast text and image attachments to all connected users.",
 	},
 ];
 
@@ -136,7 +136,7 @@ export function QuickGuide() {
 									<span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-400" />
 								</span>
 								<span className="text-[11px] tracking-[0.32em] text-red-400">
-									SYS_MANUAL
+									GUIDE
 								</span>
 								<span
 									className="px-1.5 py-px text-[9px] tracking-widest text-red-900"
