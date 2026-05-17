@@ -210,8 +210,6 @@ export function TacticalDashboard() {
 		) as Record<string, ChatMsg[]>;
 	};
 
-	const base = profile ?? DEFAULT_LOCATION;
-
 	function getVoteTotals(votes?: Record<string, VoteValue>) {
 		const values = Object.values(votes ?? {});
 		return {
@@ -289,17 +287,6 @@ export function TacticalDashboard() {
 
 		return true;
 	}
-
-	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
-		refetchInterval: 3000,
-		enabled: mounted,
-	});
-	const register = api.p2p.register.useMutation();
-	const sendMessage = api.p2p.sendMessage.useMutation();
-	const { data: incomingMessages } = api.p2p.getMessages.useQuery(
-		{ peerId: profile?.username ?? "" },
-		{ refetchInterval: 2000, enabled: mounted && !!profile },
-	);
 
 	useEffect(() => {
 		setMounted(true);
