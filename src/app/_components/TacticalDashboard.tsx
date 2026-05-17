@@ -90,7 +90,6 @@ export type Incident = {
 
 type VoteValue = 1 | -1;
 
-// msgId for exact dedup; image for optional photo attachments
 type ChatMsg = {
 	from: string;
 	image?: string | null;
@@ -100,6 +99,26 @@ type ChatMsg = {
 };
 
 type RouteState = { geojson: GeoJSON.LineString; eta: number };
+
+// ─── Geo state machine ────────────────────────────────────────────────────────
+type GeoStatus =
+	| "idle"
+	| "requesting"
+	| "acquired"
+	| "denied"
+	| "unavailable"
+	| "timeout"
+	| "unsupported";
+
+const GEO_META: Record<GeoStatus, { label: string; color: string; hint?: string }> = {
+	idle:        { label: "NOT SET",            color: "rgba(255,255,255,0.2)" },
+	requesting:  { label: "ACQUIRING SIGNAL…",  color: "#f59e0b" },
+	acquired:    { label: "SIGNAL LOCKED",      color: "#4ade80" },
+	denied:      { label: "PERMISSION DENIED",  color: "#ef4444", hint: "Enable location in browser settings." },
+	unavailable: { label: "UNAVAILABLE",        color: "#f59e0b", hint: "Use map pin instead." },
+	timeout:     { label: "SIGNAL TIMEOUT",     color: "#f59e0b", hint: "Try again or pin manually." },
+	unsupported: { label: "GPS UNSUPPORTED",    color: "#ef4444", hint: "Use the map to set position." },
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -134,9 +153,46 @@ export function TacticalDashboard() {
 		lng: number;
 	} | null>(null);
 	const [showOnboard, setShowOnboard] = useState(false);
-	const [hqDraft, setHqDraft] = useState<{ lat: number; lng: number } | null>(
-		null,
-	);
+
+	// Manual map pin on onboarding map
+	const [hqDraft, setHqDraft] = useState<{ lat: number; lng: number } | null>(null);
+
+	// ─── Geolocation state ───────────────────────────────────────────
+	const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
+	const [geoCoords, setGeoCoords] = useState<{ lat: number; lng: number } | null>(null);
+	const [geoAccuracy, setGeoAccuracy] = useState<number | null>(null);
+	const [onboardView, setOnboardView] = useState({
+		longitude: DEFAULT_LOCATION.lng,
+		latitude: DEFAULT_LOCATION.lat,
+		zoom: 10,
+	});
+
+	// GPS takes priority; manual pin is fallback
+	const activeCoord = geoStatus === "acquired" ? geoCoords : hqDraft;
+
+	const detectLocation = () => {
+		if (!navigator.geolocation) { setGeoStatus("unsupported"); return; }
+		setGeoStatus("requesting");
+		navigator.geolocation.getCurrentPosition(
+			(pos) => {
+				const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+				setGeoCoords(coords);
+				setGeoAccuracy(pos.coords.accuracy);
+				setGeoStatus("acquired");
+				setOnboardView({ longitude: coords.lng, latitude: coords.lat, zoom: 14 });
+			},
+			(err) => {
+				switch (err.code) {
+					case err.PERMISSION_DENIED:    setGeoStatus("denied");      break;
+					case err.POSITION_UNAVAILABLE: setGeoStatus("unavailable"); break;
+					case err.TIMEOUT:              setGeoStatus("timeout");     break;
+					default:                       setGeoStatus("unavailable"); break;
+				}
+			},
+			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+		);
+	};
+	// ─────────────────────────────────────────────────────────────────
 
 	const [chatImage, setChatImage] = useState<string | null>(null);
 	const chatFileRef = useRef<HTMLInputElement>(null);
@@ -157,10 +213,7 @@ export function TacticalDashboard() {
 	const [postMsg, setPostMsg] = useState("");
 	const [postType, setPostType] = useState<Incident["type"]>("REQUEST");
 	const [postPriority, setPostPriority] = useState<Incident["priority"]>("MED");
-	const [postCoord, setPostCoord] = useState<{
-		lat: number;
-		lng: number;
-	} | null>(null);
+	const [postCoord, setPostCoord] = useState<{ lat: number; lng: number } | null>(null);
 	const [postStep, setPostStep] = useState<"form" | "map">("form");
 
 	const [obUsername, setObUsername] = useState("");
@@ -198,18 +251,6 @@ export function TacticalDashboard() {
 			msgId: getChatMessageId(room, message, index),
 		}));
 
-	const readPersistedChats = () => {
-		const savedChat = localStorage.getItem("gd_chats");
-		if (!savedChat) return {} as Record<string, ChatMsg[]>;
-		const parsed = JSON.parse(savedChat) as Record<string, ChatMsg[]>;
-		return Object.fromEntries(
-			Object.entries(parsed).map(([room, messages]) => [
-				room,
-				normalizeChatThread(room, messages),
-			]),
-		) as Record<string, ChatMsg[]>;
-	};
-
 	function getVoteTotals(votes?: Record<string, VoteValue>) {
 		const values = Object.values(votes ?? {});
 		return {
@@ -232,23 +273,15 @@ export function TacticalDashboard() {
 		const upsert = (incident: Incident) => {
 			const existing = merged.get(incident.id);
 			if (!existing) {
-				merged.set(incident.id, {
-					...incident,
-					votes: { ...(incident.votes ?? {}) },
-				});
+				merged.set(incident.id, { ...incident, votes: { ...(incident.votes ?? {}) } });
 				return;
 			}
-
 			merged.set(incident.id, {
 				...existing,
 				...incident,
-				votes: {
-					...(existing.votes ?? {}),
-					...(incident.votes ?? {}),
-				},
+				votes: { ...(existing.votes ?? {}), ...(incident.votes ?? {}) },
 			});
 		};
-
 		base.forEach(upsert);
 		snapshots.forEach(upsert);
 		return [...merged.values()];
@@ -257,7 +290,6 @@ export function TacticalDashboard() {
 	function incidentsAreEqual(left: Incident[], right: Incident[]) {
 		if (left.length !== right.length) return false;
 		const rightById = new Map(right.map((incident) => [incident.id, incident]));
-
 		for (const incident of left) {
 			const other = rightById.get(incident.id);
 			if (!other) return false;
@@ -270,10 +302,7 @@ export function TacticalDashboard() {
 				incident.loc !== other.loc ||
 				incident.author !== other.author ||
 				incident.time !== other.time
-			) {
-				return false;
-			}
-
+			) return false;
 			const leftVotes = incident.votes ?? {};
 			const rightVotes = other.votes ?? {};
 			const leftVoteEntries = Object.entries(leftVotes);
@@ -283,7 +312,6 @@ export function TacticalDashboard() {
 				if (rightVotes[peerId] !== vote) return false;
 			}
 		}
-
 		return true;
 	}
 
@@ -307,7 +335,6 @@ export function TacticalDashboard() {
 		}
 	}, []);
 
-	// Register presence whenever state changes
 	useEffect(() => {
 		if (!mounted || !profile) return;
 		register.mutate({
@@ -318,14 +345,13 @@ export function TacticalDashboard() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [incidents, chatLogs, incidentVotes, profile]);
 
-	// Ingest incoming direct messages
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
 		setChatLogs((prev) => {
 			const updated = { ...prev };
 			let changed = false;
 			incomingMessages.forEach((m) => {
-				if (m.from === profile.username) return; // skip own messages
+				if (m.from === profile.username) return;
 				try {
 					const p = JSON.parse(String(m.data));
 					if (p.type !== "INCIDENT_CHAT") return;
@@ -351,9 +377,7 @@ export function TacticalDashboard() {
 						});
 						changed = true;
 					}
-				} catch {
-					/* malformed message — ignore */
-				}
+				} catch { /* */ }
 			});
 			if (changed) {
 				localStorage.setItem("gd_chats", JSON.stringify(updated));
@@ -365,100 +389,69 @@ export function TacticalDashboard() {
 
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
-
 		setIncidentVotes((prev) => {
 			let changed = false;
 			const next = { ...prev };
-
 			for (const message of incomingMessages) {
 				if (message.from === profile.username) continue;
-
 				try {
 					const payload = JSON.parse(String(message.data)) as {
 						type?: string;
-						data?: {
-							incidentId?: string;
-							vote?: VoteValue;
-							voterId?: string;
-						};
+						data?: { incidentId?: string; vote?: VoteValue; voterId?: string };
 					};
-
 					if (payload.type !== "INCIDENT_VOTE") continue;
-
 					const incidentId = payload.data?.incidentId;
 					if (!incidentId) continue;
-
 					const voterId = payload.data?.voterId ?? message.from;
 					const vote = payload.data?.vote === -1 ? -1 : 1;
-
 					const existing = next[incidentId] ?? {};
 					if (existing[voterId] === vote) continue;
-
-					next[incidentId] = {
-						...existing,
-						[voterId]: vote,
-					};
+					next[incidentId] = { ...existing, [voterId]: vote };
 					changed = true;
-				} catch {
-					/* */
-				}
+				} catch { /* */ }
 			}
-
 			return changed ? next : prev;
 		});
 	}, [incomingMessages, profile]);
 
 	useEffect(() => {
 		if (!peers || !profile) return;
-
 		const peerSnapshots = peers.flatMap((peer) =>
 			((peer.metadata?.incidents as Incident[]) ?? []).map((incident) => ({
 				...incident,
 				author: peer.peerId,
 			})),
 		);
-
 		setIncidents((prev) => {
 			const merged = mergeIncidentSnapshots(prev, peerSnapshots);
 			if (incidentsAreEqual(prev, merged)) return prev;
 			localStorage.setItem("gd_incidents", JSON.stringify(merged));
 			return merged;
 		});
-
 		setIncidentVotes((prev) => {
 			let changed = false;
 			const next = { ...prev };
-
 			for (const peer of peers) {
 				const peerVotes = peer.metadata?.incidentVotes as
 					| Record<string, Record<string, VoteValue>>
 					| undefined;
 				if (!peerVotes) continue;
-
 				for (const [incidentId, votes] of Object.entries(peerVotes)) {
 					const mergedVotes = mergeVotes(next[incidentId], votes);
 					const currentVotes = next[incidentId] ?? {};
 					if (
-						Object.keys(currentVotes).length ===
-							Object.keys(mergedVotes).length &&
-						Object.entries(mergedVotes).every(
-							([peerId, vote]) => currentVotes[peerId] === vote,
-						)
-					) {
-						continue;
-					}
-
+						Object.keys(currentVotes).length === Object.keys(mergedVotes).length &&
+						Object.entries(mergedVotes).every(([peerId, vote]) => currentVotes[peerId] === vote)
+					) continue;
 					next[incidentId] = mergedVotes;
 					changed = true;
 				}
 			}
-
 			if (!changed) return prev;
 			return next;
 		});
 	}, [peers, profile]);
 
-	// Merge chat history from peer metadata; skip self to avoid duplicates
 	useEffect(() => {
 		if (!peers || !profile) return;
 		setChatLogs((prev) => {
@@ -467,10 +460,7 @@ export function TacticalDashboard() {
 			peers
 				.filter((p) => p.peerId !== profile.username)
 				.forEach((p) => {
-					const peerChats = (p.metadata?.chatLogs ?? {}) as Record<
-						string,
-						ChatMsg[]
-					>;
+					const peerChats = (p.metadata?.chatLogs ?? {}) as Record<string, ChatMsg[]>;
 					Object.entries(peerChats).forEach(([roomId, msgs]) => {
 						const room = normalizeChatThread(roomId, merged[roomId] ?? []);
 						const peerThread = normalizeChatThread(roomId, msgs);
@@ -492,7 +482,6 @@ export function TacticalDashboard() {
 		});
 	}, [peers, profile]);
 
-	// Scroll chat to bottom on new messages
 	useEffect(() => {
 		chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [chatLogs, selected, rightPanel]);
@@ -508,10 +497,8 @@ export function TacticalDashboard() {
 		);
 		feed = mergeIncidentSnapshots(feed, peerSnapshots);
 	}
-	const w: Record<string, number> = { HIGH: 3, MED: 2, LOW: 1 };
 	feed.sort((a, b) => {
-		const pDiff =
-			(PRIORITY_WEIGHT[b.priority] ?? 0) - (PRIORITY_WEIGHT[a.priority] ?? 0);
+		const pDiff = (PRIORITY_WEIGHT[b.priority] ?? 0) - (PRIORITY_WEIGHT[a.priority] ?? 0);
 		if (pDiff !== 0) return pDiff;
 		return (
 			parseFloat(haversine(base.lat, base.lng, a.lat, a.lng)) -
@@ -527,34 +514,22 @@ export function TacticalDashboard() {
 
 	const handleVote = async (incident: Incident, vote: VoteValue) => {
 		if (!profile) return;
-
 		flushSync(() => {
 			setIncidentVotes((prev) => ({
 				...prev,
-				[incident.id]: {
-					...(prev[incident.id] ?? {}),
-					[profile.username]: vote,
-				},
+				[incident.id]: { ...(prev[incident.id] ?? {}), [profile.username]: vote },
 			}));
 			setIncidents((prev) => {
 				const updated = prev.map((item) =>
 					item.id === incident.id
-						? {
-								...item,
-								votes: {
-									...(item.votes ?? {}),
-									[profile.username]: vote,
-								},
-							}
+						? { ...item, votes: { ...(item.votes ?? {}), [profile.username]: vote } }
 						: item,
 				);
 				localStorage.setItem("gd_incidents", JSON.stringify(updated));
 				return updated;
 			});
 		});
-
 		if (incident.author === profile.username) return;
-
 		const recipients = Array.from(
 			new Set(
 				[...(peers ?? []).map((peer) => peer.peerId), incident.author].filter(
@@ -562,7 +537,6 @@ export function TacticalDashboard() {
 				),
 			),
 		);
-
 		await Promise.all(
 			recipients.map((to) =>
 				sendMessage.mutateAsync({
@@ -571,11 +545,7 @@ export function TacticalDashboard() {
 					type: "DIRECT_MESSAGE",
 					data: JSON.stringify({
 						type: "INCIDENT_VOTE",
-						data: {
-							incidentId: incident.id,
-							vote,
-							voterId: profile.username,
-						},
+						data: { incidentId: incident.id, vote, voterId: profile.username },
 					}),
 				}),
 			),
@@ -598,13 +568,8 @@ export function TacticalDashboard() {
 			);
 			const d = await r.json();
 			if (d.routes?.[0])
-				setRoute({
-					geojson: d.routes[0].geometry,
-					eta: Math.ceil(d.routes[0].duration / 60),
-				});
-		} catch {
-			/* routing failed — silent */
-		} finally {
+				setRoute({ geojson: d.routes[0].geometry, eta: Math.ceil(d.routes[0].duration / 60) });
+		} catch { /* */ } finally {
 			setRouting(false);
 		}
 	};
@@ -618,14 +583,12 @@ export function TacticalDashboard() {
 		e.preventDefault();
 		if (!selected || !profile) return;
 		if (!chatInput.trim() && !chatImage) return;
-
 		const text = chatInput.trim();
 		const image = chatImage ?? undefined;
 		setChatInput("");
 		setChatImage(null);
 		const now = Date.now();
 		const msgId = Math.random().toString(36).slice(2, 11);
-
 		setChatLogs((prev) => {
 			const updated = {
 				...prev,
@@ -637,7 +600,6 @@ export function TacticalDashboard() {
 			localStorage.setItem("gd_chats", JSON.stringify(updated));
 			return updated;
 		});
-
 		if (peers && (text || image)) {
 			const payload = JSON.stringify({
 				type: "INCIDENT_CHAT",
@@ -645,9 +607,7 @@ export function TacticalDashboard() {
 			});
 			const uniquePeers = peers
 				.filter((p) => p.peerId !== profile.username)
-				.filter(
-					(p, i, arr) => arr.findIndex((x) => x.peerId === p.peerId) === i,
-				);
+				.filter((p, i, arr) => arr.findIndex((x) => x.peerId === p.peerId) === i);
 			await Promise.all(
 				uniquePeers.map((p) =>
 					sendMessage.mutateAsync({
@@ -700,7 +660,7 @@ export function TacticalDashboard() {
 
 	const handleSaveProfile = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		if (!hqDraft) return;
+		if (!activeCoord) return;
 		const parsed = profileSchema.safeParse({
 			username: obUsername,
 			age: obAge === "" ? undefined : Number(obAge),
@@ -719,8 +679,8 @@ export function TacticalDashboard() {
 		const p = {
 			username: parsed.data.username.toUpperCase(),
 			role: parsed.data.skills.slice(0, 2).join(" / "),
-			lat: hqDraft.lat,
-			lng: hqDraft.lng,
+			lat: activeCoord.lat,
+			lng: activeCoord.lng,
 		};
 		setProfile(p);
 		localStorage.setItem("gd_profile", JSON.stringify(p));
@@ -728,6 +688,10 @@ export function TacticalDashboard() {
 	};
 
 	if (!mounted) return null;
+
+	const geoMeta = GEO_META[geoStatus];
+	const isLocating = geoStatus === "requesting";
+	const hasGeoError = ["denied", "unavailable", "timeout", "unsupported"].includes(geoStatus);
 
 	// ─── Render ───────────────────────────────────────────────────────────────
 	return (
@@ -737,30 +701,36 @@ export function TacticalDashboard() {
         .gd { font-family: 'IBM Plex Mono', monospace; }
         @keyframes gd-pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
         @keyframes gd-in { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+        @keyframes gd-spin { to{transform:rotate(360deg)} }
+        @keyframes gd-ring { 0%{transform:scale(0.8);opacity:0.8} 100%{transform:scale(2.4);opacity:0} }
         .gd-live { animation: gd-pulse 2s ease-in-out infinite; }
         .gd-in { animation: gd-in 0.18s ease-out both; }
+        .gd-spin { animation: gd-spin 1s linear infinite; }
         .gd-row { transition: background 0.1s; cursor: pointer; }
         .gd-row:hover { background: rgba(255,255,255,0.025); }
         .gd-row.active { background: rgba(255,255,255,0.04); }
+        .gd-ring {
+          position:absolute; inset:-4px; border-radius:50%;
+          border:1px solid rgba(74,222,128,0.45);
+          animation: gd-ring 1.8s ease-out infinite;
+        }
+        .gd-ring:nth-child(2){animation-delay:0.6s}
+        .gd-geo-btn { transition: all 0.15s; }
+        .gd-geo-btn:hover { filter: brightness(1.12); }
       `}</style>
 
 			<div className="gd flex h-screen flex-col overflow-hidden bg-[#0c0c0c] text-white">
 				{/* ── Header ──────────────────────────────────────────────────────── */}
 				<header className="flex shrink-0 items-center justify-between border-b border-white/6 px-6 py-3.5">
 					<div className="flex items-center gap-4">
-						<span className="text-base font-medium tracking-widest text-red-500">
-							GRIDDOWN
-						</span>
-
+						<span className="text-base font-medium tracking-widest text-red-500">GRIDDOWN</span>
 						<div className="flex items-center gap-1.5">
 							<span className="gd-live h-1.5 w-1.5 rounded-full bg-red-500" />
 							<span className="text-[10px] tracking-[0.2em] text-white/40">
 								{feed.length} {feed.length === 1 ? "TASK" : "TASKS"}
 							</span>
 						</div>
-
 						<div className="h-3 w-px bg-white/8" />
-
 						<div className="flex items-center gap-1.5">
 							<span
 								className="gd-live h-1.5 w-1.5 rounded-full bg-green-400"
@@ -770,19 +740,11 @@ export function TacticalDashboard() {
 								{(peers?.length ?? 0) + (profile ? 1 : 0)} ONLINE
 							</span>
 						</div>
-
 						<div className="h-3 w-px bg-white/8" />
-
 						<span className="text-[10px] tracking-[0.2em] text-white/40">
-							{
-								feed.filter(
-									(i) => i.type === "REQUEST" && i.priority === "HIGH",
-								).length
-							}{" "}
-							HIGH PRIORITY
+							{feed.filter((i) => i.type === "REQUEST" && i.priority === "HIGH").length} HIGH PRIORITY
 						</span>
 					</div>
-
 					<div className="flex items-center gap-5">
 						{profile ? (
 							<>
@@ -837,14 +799,8 @@ export function TacticalDashboard() {
 													onClick={() => setPostType(t)}
 													style={{
 														border: `1px solid ${postType === t ? TYPE_COLOR[t] + "55" : "rgba(255,255,255,0.2)"}`,
-														color:
-															postType === t
-																? TYPE_COLOR[t]
-																: "rgba(255,255,255,0.75)",
-														background:
-															postType === t
-																? TYPE_COLOR[t] + "0f"
-																: "transparent",
+														color: postType === t ? TYPE_COLOR[t] : "rgba(255,255,255,0.75)",
+														background: postType === t ? TYPE_COLOR[t] + "0f" : "transparent",
 													}}
 												>
 													{TYPE_LABEL[t]}
@@ -872,14 +828,8 @@ export function TacticalDashboard() {
 														onClick={() => setPostPriority(p)}
 														style={{
 															border: `1px solid ${postPriority === p ? PRIORITY_DOT[p] + "55" : "rgba(255,255,255,0.2)"}`,
-															color:
-																postPriority === p
-																	? PRIORITY_DOT[p]
-																	: "rgba(255,255,255,0.75)",
-															background:
-																postPriority === p
-																	? PRIORITY_DOT[p] + "0f"
-																	: "transparent",
+															color: postPriority === p ? PRIORITY_DOT[p] : "rgba(255,255,255,0.75)",
+															background: postPriority === p ? PRIORITY_DOT[p] + "0f" : "transparent",
 														}}
 													>
 														{p}
@@ -899,10 +849,7 @@ export function TacticalDashboard() {
 									<div className="flex gap-3">
 										<button
 											className="text-[10px] tracking-widest text-white/20 transition-colors hover:text-white/50"
-											onClick={() => {
-												setPostStep("form");
-												setPostCoord(null);
-											}}
+											onClick={() => { setPostStep("form"); setPostCoord(null); }}
 										>
 											BACK
 										</button>
@@ -928,9 +875,7 @@ export function TacticalDashboard() {
 						<div className="flex-1 overflow-y-auto">
 							{feed.length === 0 && (
 								<div className="flex h-32 items-center justify-center">
-									<span className="text-[10px] tracking-[0.3em] text-white/15">
-										NO TRANSMISSIONS
-									</span>
+									<span className="text-[10px] tracking-[0.3em] text-white/15">NO TRANSMISSIONS</span>
 								</div>
 							)}
 							{feed.map((inc, i) => (
@@ -942,13 +887,11 @@ export function TacticalDashboard() {
 								>
 									<div className="px-4 py-3.5">
 										<div className="flex items-start gap-2.5">
-											{/* Priority dot */}
 											<span
 												className="mt-1.25 h-1.5 w-1.5 shrink-0 rounded-full"
 												style={{ background: PRIORITY_DOT[inc.priority] }}
 											/>
 											<div className="min-w-0 flex-1">
-												{/* Type label + message */}
 												<div className="mb-1 flex items-center gap-2">
 													<span
 														className="shrink-0 text-[9px] tracking-widest"
@@ -960,51 +903,33 @@ export function TacticalDashboard() {
 														{inc.msg}
 													</span>
 												</div>
-												{/* Meta row */}
 												<div className="flex items-center gap-3">
-													<span className="text-[9px] text-white/40">
-														{inc.author}
-													</span>
-													<span className="text-[9px] text-white/35">
-														{timeAgo(inc.time)}
-													</span>
+													<span className="text-[9px] text-white/40">{inc.author}</span>
+													<span className="text-[9px] text-white/35">{timeAgo(inc.time)}</span>
 													<div className="ml-auto flex items-center gap-2">
 														<span
 															className="shrink-0 text-[9px] tracking-widest"
-															style={{
-																color: PRIORITY_DOT[inc.priority],
-																opacity: 0.8,
-															}}
+															style={{ color: PRIORITY_DOT[inc.priority], opacity: 0.8 }}
 														>
 															{inc.priority}
 														</span>
 														<span className="text-[9px] text-white/40">
-															{haversine(base.lat, base.lng, inc.lat, inc.lng)}
-															km
+															{haversine(base.lat, base.lng, inc.lat, inc.lng)}km
 														</span>
 														{(() => {
 															const visibleVotes = getVisibleVotes(inc);
-															const { upvotes, downvotes } =
-																getVoteTotals(visibleVotes);
-															const currentVote =
-																profile?.username && visibleVotes
-																	? visibleVotes[profile.username]
-																	: undefined;
-
+															const { upvotes, downvotes } = getVoteTotals(visibleVotes);
+															const currentVote = profile?.username && visibleVotes
+																? visibleVotes[profile.username]
+																: undefined;
 															return (
 																<>
 																	<button
 																		className="rounded border px-2 py-0.5 text-[9px]"
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			void handleVote(inc, 1);
-																		}}
+																		onClick={(e) => { e.stopPropagation(); void handleVote(inc, 1); }}
 																		style={{
 																			borderColor: "rgba(34,197,94,0.18)",
-																			color:
-																				currentVote === 1
-																					? "#4ade80"
-																					: "rgba(74,222,128,0.65)",
+																			color: currentVote === 1 ? "#4ade80" : "rgba(74,222,128,0.65)",
 																			background: "rgba(34,197,94,0.04)",
 																		}}
 																		type="button"
@@ -1013,16 +938,10 @@ export function TacticalDashboard() {
 																	</button>
 																	<button
 																		className="rounded border px-2 py-0.5 text-[9px]"
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			void handleVote(inc, -1);
-																		}}
+																		onClick={(e) => { e.stopPropagation(); void handleVote(inc, -1); }}
 																		style={{
 																			borderColor: "rgba(239,68,68,0.18)",
-																			color:
-																				currentVote === -1
-																					? "#f87171"
-																					: "rgba(248,113,113,0.65)",
+																			color: currentVote === -1 ? "#f87171" : "rgba(248,113,113,0.65)",
 																			background: "rgba(239,68,68,0.04)",
 																		}}
 																		type="button"
@@ -1036,40 +955,26 @@ export function TacticalDashboard() {
 												</div>
 											</div>
 										</div>
-
-										{/* Expanded actions */}
 										{selected === inc.id && (
 											<div className="gd-in mt-3 flex items-center gap-2 pl-4">
 												{routing && (
-													<span className="gd-live text-[9px] text-amber-400/60">
-														routing…
-													</span>
+													<span className="gd-live text-[9px] text-amber-400/60">routing…</span>
 												)}
 												{route && !routing && (
-													<span className="text-[9px] text-green-400/70">
-														ETA {route.eta} min
-													</span>
+													<span className="text-[9px] text-green-400/70">ETA {route.eta} min</span>
 												)}
 												<div className="ml-auto flex gap-2">
 													<button
 														className="px-2.5 py-1 text-[9px] tracking-widest text-white/50 transition-colors hover:text-white/60"
-														onClick={(e) => {
-															e.stopPropagation();
-															openChat(inc.id);
-														}}
-														style={{
-															border: "1px solid rgba(255,255,255,0.2)",
-														}}
+														onClick={(e) => { e.stopPropagation(); openChat(inc.id); }}
+														style={{ border: "1px solid rgba(255,255,255,0.2)" }}
 													>
 														CHAT
 													</button>
 													{inc.author === profile?.username && (
 														<button
 															className="px-2.5 py-1 text-[9px] tracking-widest transition-colors"
-															onClick={(e) => {
-																e.stopPropagation();
-																handleResolve(inc.id);
-															}}
+															onClick={(e) => { e.stopPropagation(); handleResolve(inc.id); }}
 															style={{
 																border: "1px solid rgba(34,197,94,0.25)",
 																color: "rgba(74,222,128,0.55)",
@@ -1090,7 +995,6 @@ export function TacticalDashboard() {
 					{/* ── Right panel: map or chat ───────────────────────────────────── */}
 					<div className="relative flex flex-1 flex-col overflow-hidden">
 						{rightPanel === "chat" && selectedInc ? (
-							/* Chat view */
 							<div className="flex h-full flex-col">
 								<div className="flex shrink-0 items-center justify-between border-b border-white/6 px-5 py-3.5">
 									<div>
@@ -1117,13 +1021,10 @@ export function TacticalDashboard() {
 										← MAP
 									</button>
 								</div>
-
 								<div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
 									{activeChat.length === 0 && (
 										<div className="flex h-24 items-center justify-center">
-											<span className="text-[10px] tracking-[0.25em] text-white/50">
-												NO MESSAGES YET
-											</span>
+											<span className="text-[10px] tracking-[0.25em] text-white/50">NO MESSAGES YET</span>
 										</div>
 									)}
 									{activeChat.map((msg, idx) => {
@@ -1139,12 +1040,8 @@ export function TacticalDashboard() {
 												<div
 													className="max-w-[78%] px-3.5 py-2.5 text-[11px] leading-relaxed"
 													style={{
-														background: isMe
-															? "rgba(255,255,255,0.04)"
-															: "rgba(239,68,68,0.06)",
-														border: isMe
-															? "1px solid rgba(255,255,255,0.2)"
-															: "1px solid rgba(239,68,68,0.15)",
+														background: isMe ? "rgba(255,255,255,0.04)" : "rgba(239,68,68,0.06)",
+														border: isMe ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(239,68,68,0.15)",
 														color: "rgba(255,255,255,0.65)",
 													}}
 												>
@@ -1153,10 +1050,7 @@ export function TacticalDashboard() {
 															alt=""
 															className="mb-2 max-w-full"
 															src={msg.image}
-															style={{
-																maxHeight: 200,
-																border: "1px solid rgba(255,255,255,0.06)",
-															}}
+															style={{ maxHeight: 200, border: "1px solid rgba(255,255,255,0.06)" }}
 														/>
 													)}
 													{msg.text && <span>{msg.text}</span>}
@@ -1166,7 +1060,6 @@ export function TacticalDashboard() {
 									})}
 									<div ref={chatBottomRef} />
 								</div>
-
 								<form
 									className="flex shrink-0 flex-col gap-2 border-t border-white/6 p-3"
 									onSubmit={handleSendChat}
@@ -1205,8 +1098,7 @@ export function TacticalDashboard() {
 												const file = e.target.files?.[0];
 												if (!file) return;
 												const reader = new FileReader();
-												reader.onload = () =>
-													setChatImage(reader.result as string);
+												reader.onload = () => setChatImage(reader.result as string);
 												reader.readAsDataURL(file);
 											}}
 											ref={chatFileRef}
@@ -1235,7 +1127,6 @@ export function TacticalDashboard() {
 								</form>
 							</div>
 						) : (
-							/* Map view */
 							<div className="relative h-full w-full">
 								<MapGL
 									attributionControl={false}
@@ -1250,32 +1141,19 @@ export function TacticalDashboard() {
 										if (postStep === "map")
 											setPostCoord({ lat: e.lngLat.lat, lng: e.lngLat.lng });
 									}}
-									style={{
-										cursor: postStep === "map" ? "crosshair" : "default",
-									}}
+									style={{ cursor: postStep === "map" ? "crosshair" : "default" }}
 								>
-									{/* Route line */}
 									{route && (
 										<Source data={route.geojson} id="route" type="geojson">
 											<Layer
 												id="route-line"
 												layout={{ "line-cap": "round", "line-join": "round" }}
-												paint={{
-													"line-color": "#22c55e",
-													"line-width": 2,
-													"line-opacity": 0.6,
-												}}
+												paint={{ "line-color": "#22c55e", "line-width": 2, "line-opacity": 0.6 }}
 												type="line"
 											/>
 										</Source>
 									)}
-
-									{/* Own location marker */}
-									<Marker
-										anchor="center"
-										latitude={base.lat}
-										longitude={base.lng}
-									>
+									<Marker anchor="center" latitude={base.lat} longitude={base.lng}>
 										<div className="relative flex h-5 w-5 items-center justify-center">
 											<span className="absolute inset-0 rounded-full bg-green-500/15 gd-live" />
 											<span
@@ -1284,25 +1162,15 @@ export function TacticalDashboard() {
 											/>
 										</div>
 									</Marker>
-
-									{/* Incident markers */}
 									{feed.map((inc) => {
 										const color = TYPE_COLOR[inc.type] ?? "#ef4444";
 										const isActive = selected === inc.id;
 										return (
-											<Marker
-												anchor="center"
-												key={inc.id}
-												latitude={inc.lat}
-												longitude={inc.lng}
-											>
+											<Marker anchor="center" key={inc.id} latitude={inc.lat} longitude={inc.lng}>
 												<button
 													className="relative flex items-center justify-center"
 													onClick={() => handleSelect(inc)}
-													style={{
-														width: isActive ? 28 : 20,
-														height: isActive ? 28 : 20,
-													}}
+													style={{ width: isActive ? 28 : 20, height: isActive ? 28 : 20 }}
 												>
 													{isActive && (
 														<span
@@ -1327,14 +1195,8 @@ export function TacticalDashboard() {
 											</Marker>
 										);
 									})}
-
-									{/* Post pin preview */}
 									{postCoord && (
-										<Marker
-											anchor="center"
-											latitude={postCoord.lat}
-											longitude={postCoord.lng}
-										>
+										<Marker anchor="center" latitude={postCoord.lat} longitude={postCoord.lng}>
 											<div className="relative flex h-5 w-5 items-center justify-center">
 												<span className="absolute inset-0 rounded-full bg-amber-400/15 gd-live" />
 												<span className="h-2 w-2 rounded-full bg-amber-400" />
@@ -1342,8 +1204,6 @@ export function TacticalDashboard() {
 										</Marker>
 									)}
 								</MapGL>
-
-								{/* Selected incident info bar */}
 								{selectedInc && (
 									<div
 										className="gd-in absolute bottom-4 left-4 right-4 px-4 py-3.5"
@@ -1365,22 +1225,16 @@ export function TacticalDashboard() {
 													{selectedInc.priority !== "LOW" && (
 														<span
 															className="text-[9px] tracking-widest"
-															style={{
-																color: PRIORITY_DOT[selectedInc.priority],
-															}}
+															style={{ color: PRIORITY_DOT[selectedInc.priority] }}
 														>
 															{selectedInc.priority}
 														</span>
 													)}
 													{route && (
-														<span className="text-[9px] text-green-400/70">
-															{route.eta} min
-														</span>
+														<span className="text-[9px] text-green-400/70">{route.eta} min</span>
 													)}
 												</div>
-												<p className="text-[12px] leading-relaxed text-white/65">
-													{selectedInc.msg}
-												</p>
+												<p className="text-[12px] leading-relaxed text-white/65">{selectedInc.msg}</p>
 												<p className="mt-1 text-[9px] text-white/25">
 													{selectedInc.loc} · {selectedInc.author}
 												</p>
@@ -1388,10 +1242,7 @@ export function TacticalDashboard() {
 											<div className="flex flex-col items-end gap-2">
 												<button
 													className="text-[11px] text-white/20 transition-colors hover:text-white/50"
-													onClick={() => {
-														setSelected(null);
-														setRoute(null);
-													}}
+													onClick={() => { setSelected(null); setRoute(null); }}
 												>
 													✕
 												</button>
@@ -1406,8 +1257,6 @@ export function TacticalDashboard() {
 										</div>
 									</div>
 								)}
-
-								{/* Pin location hint */}
 								{postStep === "map" && (
 									<div
 										className="gd-in pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 px-4 py-2"
@@ -1442,35 +1291,27 @@ export function TacticalDashboard() {
 							overflowY: "auto",
 						}}
 					>
-						<h2 className="mb-1 text-sm tracking-[0.25em] text-white/60">
-							YOUR PROFILE
-						</h2>
-						<p className="mb-6 text-[10px] text-white/40">
-							Set your name to get started.
-						</p>
+						<h2 className="mb-1 text-sm tracking-[0.25em] text-white/60">OPERATOR PROFILE</h2>
+						<p className="mb-6 text-[10px] text-white/25">Set your name to join the mesh.</p>
 
 						<div className="flex flex-col gap-5">
-							{/* Name */}
+							{/* Callsign */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
-									<span className="text-[9px] tracking-[0.25em] text-white/50">
-										NAME
-									</span>
+									<span className="text-[9px] tracking-[0.25em] text-white/30">CALLSIGN</span>
 									{obErrors.username && (
-										<span className="text-[9px] text-red-500/70">
-											{obErrors.username}
-										</span>
+										<span className="text-[9px] text-red-500/70">{obErrors.username}</span>
 									)}
 								</label>
 								<input
-									className="w-full bg-transparent px-3 py-2.5 text-[12px] uppercase text-white/75 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
+									className="w-full bg-transparent px-3 py-2.5 text-[12px] text-white/75 outline-none placeholder:text-white/15 uppercase transition-colors focus:bg-white/3"
 									onChange={(e) => {
 										setObUsername(e.target.value.toUpperCase());
 										setObErrors((prev) => ({ ...prev, username: undefined }));
 									}}
-									placeholder="e.g. ALEX"
+									placeholder="e.g. DELTA-7"
 									style={{
-										border: `1px solid ${obErrors.username ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.2)"}`,
+										border: `1px solid ${obErrors.username ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.07)"}`,
 									}}
 									value={obUsername}
 								/>
@@ -1479,13 +1320,9 @@ export function TacticalDashboard() {
 							{/* Age */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
-									<span className="text-[9px] tracking-[0.25em] text-white/50">
-										AGE
-									</span>
+									<span className="text-[9px] tracking-[0.25em] text-white/30">AGE</span>
 									{obErrors.age && (
-										<span className="text-[9px] text-red-500/70">
-											{obErrors.age}
-										</span>
+										<span className="text-[9px] text-red-500/70">{obErrors.age}</span>
 									)}
 								</label>
 								<input
@@ -1498,7 +1335,7 @@ export function TacticalDashboard() {
 									}}
 									placeholder="e.g. 34"
 									style={{
-										border: `1px solid ${obErrors.age ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.2)"}`,
+										border: `1px solid ${obErrors.age ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.07)"}`,
 									}}
 									type="number"
 									value={obAge}
@@ -1508,16 +1345,11 @@ export function TacticalDashboard() {
 							{/* Skills */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
-									<span className="text-[9px] tracking-[0.25em] text-white/50">
-										SKILLS
-									</span>
+									<span className="text-[9px] tracking-[0.25em] text-white/30">SKILLS</span>
 									{obErrors.skills && (
-										<span className="text-[9px] text-red-500/70">
-											{obErrors.skills}
-										</span>
+										<span className="text-[9px] text-red-500/70">{obErrors.skills}</span>
 									)}
 								</label>
-
 								{obSkills.length > 0 && (
 									<div
 										className="mb-2 flex flex-wrap gap-1.5 p-2"
@@ -1530,9 +1362,7 @@ export function TacticalDashboard() {
 											<button
 												className="flex items-center gap-1.5 px-2 py-0.5 text-[9px] tracking-wide transition-all hover:opacity-70"
 												key={skill}
-												onClick={() =>
-													setObSkills((prev) => prev.filter((s) => s !== skill))
-												}
+												onClick={() => setObSkills((prev) => prev.filter((s) => s !== skill))}
 												style={{
 													background: "rgba(239,68,68,0.1)",
 													border: "1px solid rgba(239,68,68,0.3)",
@@ -1546,7 +1376,6 @@ export function TacticalDashboard() {
 										))}
 									</div>
 								)}
-
 								<input
 									className="mb-2 w-full bg-transparent px-3 py-2 text-[11px] text-white/60 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
 									onChange={(e) => setSkillSearch(e.target.value)}
@@ -1554,11 +1383,7 @@ export function TacticalDashboard() {
 									style={{ border: "1px solid rgba(255,255,255,0.06)" }}
 									value={skillSearch}
 								/>
-
-								<div
-									className="flex flex-wrap gap-1.5 overflow-y-auto"
-									style={{ maxHeight: 120 }}
-								>
+								<div className="flex flex-wrap gap-1.5 overflow-y-auto" style={{ maxHeight: 120 }}>
 									{SKILL_OPTIONS.filter(
 										(s) =>
 											s.toLowerCase().includes(skillSearch.toLowerCase()) &&
@@ -1572,7 +1397,7 @@ export function TacticalDashboard() {
 												setObErrors((prev) => ({ ...prev, skills: undefined }));
 											}}
 											style={{
-												border: "1px solid rgba(255,255,255,0.2)",
+												border: "1px solid rgba(255,255,255,0.07)",
 												color: "rgba(255,255,255,0.25)",
 											}}
 											type="button"
@@ -1583,65 +1408,157 @@ export function TacticalDashboard() {
 								</div>
 							</div>
 
-							{/* Location */}
+							{/* ── Location: geo button + map ── */}
 							<div>
-								<label className="mb-1.5 block text-[9px] tracking-[0.25em] text-white/50">
-									YOUR LOCATION{" "}
-									<span className="text-white/15">(click map)</span>
-								</label>
+								<label className="mb-2 block text-[9px] tracking-[0.25em] text-white/30">LOCATION</label>
+
+								{/* Geo detect button */}
+								<button
+									className="gd-geo-btn mb-2 w-full px-3 py-2.5 flex items-center justify-between"
+									disabled={isLocating}
+									onClick={detectLocation}
+									style={{
+										border: geoStatus === "acquired"
+											? "1px solid rgba(74,222,128,0.35)"
+											: hasGeoError
+											? "1px solid rgba(239,68,68,0.25)"
+											: "1px solid rgba(255,255,255,0.1)",
+										background: geoStatus === "acquired"
+											? "rgba(34,197,94,0.05)"
+											: hasGeoError
+											? "rgba(239,68,68,0.04)"
+											: "rgba(255,255,255,0.02)",
+									}}
+									type="button"
+								>
+									<div className="flex items-center gap-2.5">
+										<div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+											{geoStatus === "acquired" && (
+												<>
+													<div className="gd-ring" />
+													<div className="gd-ring" style={{ animationDelay: "0.6s" }} />
+												</>
+											)}
+											{isLocating ? (
+												<svg className="gd-spin" fill="none" height="14" stroke={geoMeta.color} strokeWidth="1.5" viewBox="0 0 24 24" width="14">
+													<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+												</svg>
+											) : geoStatus === "acquired" ? (
+												<svg fill="none" height="14" stroke="#4ade80" strokeWidth="1.5" viewBox="0 0 24 24" width="14">
+													<circle cx="12" cy="12" fill="#4ade80" r="3" stroke="none" />
+													<path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+													<circle cx="12" cy="12" r="7" />
+												</svg>
+											) : hasGeoError ? (
+												<svg fill="none" height="14" stroke="#ef4444" strokeWidth="1.5" viewBox="0 0 24 24" width="14">
+													<path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+													<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+												</svg>
+											) : (
+												<svg fill="none" height="14" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" viewBox="0 0 24 24" width="14">
+													<circle cx="12" cy="12" r="3" />
+													<path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+													<circle cx="12" cy="12" r="7" />
+												</svg>
+											)}
+										</div>
+										<div className="text-left">
+											<div className="text-[10px] tracking-[0.2em]" style={{ color: geoMeta.color }}>
+												{geoMeta.label}
+											</div>
+											{geoStatus === "acquired" && geoCoords && (
+												<div className="text-[9px] text-white/30 tabular-nums">
+													{geoCoords.lat.toFixed(5)}, {geoCoords.lng.toFixed(5)}
+													{geoAccuracy && (
+														<span className="ml-1.5 text-green-500/40">±{Math.round(geoAccuracy)}m</span>
+													)}
+												</div>
+											)}
+											{geoStatus === "idle" && (
+												<div className="text-[9px] text-white/20">Click to auto-detect</div>
+											)}
+											{geoMeta.hint && (
+												<div className="text-[9px] text-white/25 normal-case tracking-normal">{geoMeta.hint}</div>
+											)}
+										</div>
+									</div>
+									<span className="shrink-0 ml-2 text-[9px] tracking-[0.15em] text-white/20">
+										{geoStatus === "acquired" ? "RE-LOCK" : "DETECT →"}
+									</span>
+								</button>
+
+								{/* Map (manual pin fallback) */}
 								<div
 									className="relative overflow-hidden"
-									style={{
-										height: 150,
-										border: "1px solid rgba(255,255,255,0.2)",
-									}}
+									style={{ height: 150, border: "1px solid rgba(255,255,255,0.07)" }}
 								>
 									<MapGL
 										attributionControl={false}
-										initialViewState={{
-											longitude: DEFAULT_LOCATION.lng,
-											latitude: DEFAULT_LOCATION.lat,
-											zoom: 10,
-										}}
+										latitude={onboardView.latitude}
+										longitude={onboardView.longitude}
 										mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-										onClick={(e) =>
-											setHqDraft({ lat: e.lngLat.lat, lng: e.lngLat.lng })
-										}
+										onClick={(e) => setHqDraft({ lat: e.lngLat.lat, lng: e.lngLat.lng })}
+										onMove={(e) => setOnboardView(e.viewState)}
 										style={{ cursor: "crosshair" }}
+										zoom={onboardView.zoom}
 									>
+										{geoStatus === "acquired" && geoCoords && (
+											<Marker anchor="center" latitude={geoCoords.lat} longitude={geoCoords.lng}>
+												<div className="relative flex h-6 w-6 items-center justify-center">
+													<span className="absolute inset-0 rounded-full bg-green-500/15 gd-live" />
+													<span
+														className="h-2.5 w-2.5 rounded-full bg-green-400"
+														style={{ boxShadow: "0 0 10px rgba(74,222,128,0.8)" }}
+													/>
+												</div>
+											</Marker>
+										)}
 										{hqDraft && (
-											<Marker
-												anchor="center"
-												latitude={hqDraft.lat}
-												longitude={hqDraft.lng}
-											>
+											<Marker anchor="center" latitude={hqDraft.lat} longitude={hqDraft.lng}>
 												<span
-													className="block h-2.5 w-2.5 rounded-full bg-green-400"
-													style={{ boxShadow: "0 0 8px rgba(74,222,128,0.7)" }}
+													className="block h-2.5 w-2.5 rounded-full bg-amber-400"
+													style={{ boxShadow: "0 0 8px rgba(251,191,36,0.7)" }}
 												/>
 											</Marker>
 										)}
 									</MapGL>
-									{!hqDraft && (
+									{!activeCoord && (
 										<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
-											<span className="text-[10px] tracking-[0.3em] text-white/50">
-												CLICK TO SET
+											<span className="text-[10px] tracking-[0.3em] text-white/25">
+												AUTO-DETECT OR CLICK MAP
 											</span>
 										</div>
 									)}
 								</div>
-								{hqDraft && (
-									<p className="mt-1 text-[9px] text-green-500/60">
-										✓ {hqDraft.lat.toFixed(4)}, {hqDraft.lng.toFixed(4)}
-									</p>
-								)}
+
+								{/* Coord readout */}
+								<div className="mt-1 min-h-[14px] flex items-center justify-between">
+									{activeCoord ? (
+										<>
+											<p className="text-[9px] text-green-500/60">
+												✓ {activeCoord.lat.toFixed(4)}, {activeCoord.lng.toFixed(4)}
+											</p>
+											{hqDraft && geoStatus === "acquired" && (
+												<button
+													className="text-[8px] tracking-widest text-white/20 hover:text-white/50 transition-colors"
+													onClick={() => setHqDraft(null)}
+													type="button"
+												>
+													USE GPS
+												</button>
+											)}
+										</>
+									) : (
+										<p className="text-[9px] text-white/15">Set via GPS or map pin</p>
+									)}
+								</div>
 							</div>
 						</div>
 
 						<div className="mt-6 flex justify-end gap-3">
 							<button
 								className="px-5 py-2 text-[10px] tracking-widest transition-all disabled:opacity-25"
-								disabled={!hqDraft}
+								disabled={!activeCoord}
 								style={{
 									border: "1px solid rgba(239,68,68,0.4)",
 									color: "#f87171",
@@ -1649,7 +1566,7 @@ export function TacticalDashboard() {
 								}}
 								type="submit"
 							>
-								JOIN
+								JOIN MESH
 							</button>
 						</div>
 					</form>
