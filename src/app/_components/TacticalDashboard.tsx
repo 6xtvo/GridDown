@@ -64,6 +64,7 @@ export type Incident = {
 	author: string;
 	time: string;
 	votes?: Record<string, 1 | -1>;
+	neededBy?: string;
 };
 
 type VoteValue = 1 | -1;
@@ -144,6 +145,7 @@ export function TacticalDashboard() {
 	const [postMsg, setPostMsg] = useState("");
 	const [postType, setPostType] = useState<Incident["type"]>("REQUEST");
 	const [postPriority, setPostPriority] = useState<Incident["priority"]>("MED");
+	const [neededBy, setNeededBy] = useState("");
 	const [postCoord, setPostCoord] = useState<{
 		lat: number;
 		lng: number;
@@ -579,12 +581,14 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 			loc: `${postCoord.lat.toFixed(3)}, ${postCoord.lng.toFixed(3)}`,
 			author: profile?.username ?? "ANON",
 			time: new Date().toLocaleTimeString(),
+			neededBy: postType === "REQUEST" ? neededBy : undefined,
 		};
 		const updated = [newInc, ...incidents];
 		setIncidents(updated);
 		localStorage.setItem("gd_incidents", JSON.stringify(updated));
 		setPostMsg("");
 		setPostCoord(null);
+		setNeededBy("");
 		setPostStep("form");
 	};
 
@@ -788,6 +792,17 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 														{p}
 													</button>
 												))}
+												<div className="mt-2">
+													<input
+														className="w-full bg-transparent px-3 py-2 text-[10px] text-white/70 outline-none"
+														onChange={(e) => setNeededBy(e.target.value)}
+														style={{
+															border: "1px solid rgba(255,255,255,0.07)",
+														}}
+														type="date"
+														value={neededBy}
+													/>
+												</div>
 											</div>
 										)}
 									</div>
@@ -869,7 +884,13 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 														{inc.time}
 													</span>
 													<div className="ml-auto flex items-center gap-2">
-														<span className="text-[9px] text-white/20">
+														{inc.neededBy && (
+														<span className="text-[9px] text-amber-400/60">
+															NEEDED BY{" "}
+															{new Date(inc.neededBy).toLocaleDateString()}
+														</span>
+													)}
+													<span className="text-[9px] text-white/20">
 															{haversine(base.lat, base.lng, inc.lat, inc.lng)}km
 														</span>
 														{(() => {
