@@ -86,6 +86,7 @@ export type Incident = {
 	author: string;
 	time: string;
 	votes?: Record<string, 1 | -1>;
+	resolved?: boolean;
 };
 
 type VoteValue = 1 | -1;
@@ -273,18 +274,30 @@ export function TacticalDashboard() {
 		const upsert = (incident: Incident) => {
 			const existing = merged.get(incident.id);
 			if (!existing) {
-				merged.set(incident.id, { ...incident, votes: { ...(incident.votes ?? {}) } });
+				merged.set(incident.id, {
+					...incident,
+					votes: { ...(incident.votes ?? {}) },
+					resolved: incident.resolved ?? false,
+				});
 				return;
 			}
 			merged.set(incident.id, {
 				...existing,
 				...incident,
 				votes: { ...(existing.votes ?? {}), ...(incident.votes ?? {}) },
+				resolved: existing.resolved || incident.resolved || false,
 			});
 		};
 		base.forEach(upsert);
 		snapshots.forEach(upsert);
 		return [...merged.values()];
+	}
+
+	function normalizeIncidentSnapshot(incident: Incident, fallbackAuthor: string) {
+		return {
+			...incident,
+			author: incident.author || fallbackAuthor,
+		};
 	}
 
 	function incidentsAreEqual(left: Incident[], right: Incident[]) {
@@ -417,10 +430,11 @@ export function TacticalDashboard() {
 	useEffect(() => {
 		if (!peers || !profile) return;
 		const peerSnapshots = peers.flatMap((peer) =>
-			((peer.metadata?.incidents as Incident[]) ?? []).map((incident) => ({
-				...incident,
-				author: peer.peerId,
-			})),
+			peer.peerId === profile.username
+				? []
+				: ((peer.metadata?.incidents as Incident[]) ?? []).map((incident) =>
+					normalizeIncidentSnapshot(incident, peer.peerId),
+				),
 		);
 		setIncidents((prev) => {
 			const merged = mergeIncidentSnapshots(prev, peerSnapshots);
@@ -490,10 +504,11 @@ export function TacticalDashboard() {
 	let feed: Incident[] = [...incidents];
 	if (peers) {
 		const peerSnapshots = peers.flatMap((p) =>
-			((p.metadata?.incidents as Incident[]) ?? []).map((inc) => ({
-				...inc,
-				author: p.peerId,
-			})),
+			p.peerId === profile?.username
+				? []
+				: ((p.metadata?.incidents as Incident[]) ?? []).map((inc) =>
+					normalizeIncidentSnapshot(inc, p.peerId),
+				),
 		);
 		feed = mergeIncidentSnapshots(feed, peerSnapshots);
 	}
@@ -507,6 +522,7 @@ export function TacticalDashboard() {
 	});
 
 	const selectedInc = feed.find((i) => i.id === selected) ?? null;
+	const visibleFeed = feed.filter((incident) => !incident.resolved);
 	const activeChat = selected ? (chatLogs[selected] ?? []) : [];
 	const getVisibleVotes = (incident: Incident) => ({
 		...mergeVotes(incident.votes, incidentVotes[incident.id]),
@@ -644,7 +660,9 @@ export function TacticalDashboard() {
 	};
 
 	const handleResolve = (id: string) => {
-		const remaining = incidents.filter((i) => i.id !== id);
+		const remaining = incidents.map((incident) =>
+			incident.id === id ? { ...incident, resolved: true } : incident,
+		);
 		setIncidents(remaining);
 		localStorage.setItem("gd_incidents", JSON.stringify(remaining));
 		setSelected(null);
@@ -878,7 +896,7 @@ export function TacticalDashboard() {
 									<span className="text-[10px] tracking-[0.3em] text-white/15">NO TRANSMISSIONS</span>
 								</div>
 							)}
-							{feed.map((inc, i) => (
+							{visibleFeed.map((inc, i) => (
 								<div
 									className={`gd-row gd-in border-b border-white/4 ${selected === inc.id ? "active" : ""}`}
 									key={inc.id}
