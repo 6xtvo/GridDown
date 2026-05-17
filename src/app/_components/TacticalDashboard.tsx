@@ -1366,14 +1366,14 @@ export function TacticalDashboard() {
 							overflowY: "auto",
 						}}
 					>
-						<h2 className="mb-1 text-sm tracking-[0.25em] text-white/60">OPERATOR PROFILE</h2>
+						<h2 className="mb-1 text-sm tracking-[0.25em] text-white/60">USER PROFILE</h2>
 						<p className="mb-6 text-[10px] text-white/25">Set your name to join the mesh.</p>
 
 						<div className="flex flex-col gap-5">
 							{/* Callsign */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
-									<span className="text-[9px] tracking-[0.25em] text-white/30">CALLSIGN</span>
+									<span className="text-[9px] tracking-[0.25em] text-white/30">NAME</span>
 									{obErrors.username && (
 										<span className="text-[9px] text-red-500/70">{obErrors.username}</span>
 									)}
@@ -1384,7 +1384,7 @@ export function TacticalDashboard() {
 										setObUsername(e.target.value.toUpperCase());
 										setObErrors((prev) => ({ ...prev, username: undefined }));
 									}}
-									placeholder="e.g. DELTA-7"
+									placeholder="e.g. BUCKLEY"
 									style={{
 										border: `1px solid ${obErrors.username ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.07)"}`,
 									}}
