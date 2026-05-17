@@ -129,8 +129,8 @@ export function TacticalDashboard() {
 	const chatFileRef = useRef<HTMLInputElement>(null);
 
 	const [incidents, setIncidents] = useState<Incident[]>([]);
-	const [voteOverrides, setVoteOverrides] = useState<
-		Record<string, VoteValue>
+	const [incidentVotes, setIncidentVotes] = useState<
+		Record<string, Record<string, VoteValue>>
 	>({});
 	const [selected, setSelected] = useState<string | null>(null);
 	const [route, setRoute] = useState<RouteState | null>(null);
@@ -194,6 +194,15 @@ function getVoteTotals(votes?: Record<string, VoteValue>) {
 	};
 }
 
+function mergeVotes(
+	...voteGroups: Array<Record<string, VoteValue> | undefined>
+) {
+	return voteGroups.reduce<Record<string, VoteValue>>((acc, group) => {
+		if (!group) return acc;
+		return { ...acc, ...group };
+	}, {});
+}
+
 function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 	const merged = new Map<string, Incident>();
 	const upsert = (incident: Incident) => {
@@ -219,6 +228,40 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 	base.forEach(upsert);
 	snapshots.forEach(upsert);
 	return [...merged.values()];
+}
+
+function incidentsAreEqual(left: Incident[], right: Incident[]) {
+	if (left.length !== right.length) return false;
+	const rightById = new Map(right.map((incident) => [incident.id, incident]));
+
+	for (const incident of left) {
+		const other = rightById.get(incident.id);
+		if (!other) return false;
+		if (
+			incident.type !== other.type ||
+			incident.priority !== other.priority ||
+			incident.msg !== other.msg ||
+			incident.lat !== other.lat ||
+			incident.lng !== other.lng ||
+			incident.loc !== other.loc ||
+			incident.author !== other.author ||
+			incident.time !== other.time ||
+			incident.neededBy !== other.neededBy
+		) {
+			return false;
+		}
+
+		const leftVotes = incident.votes ?? {};
+		const rightVotes = other.votes ?? {};
+		const leftVoteEntries = Object.entries(leftVotes);
+		const rightVoteEntries = Object.entries(rightVotes);
+		if (leftVoteEntries.length !== rightVoteEntries.length) return false;
+		for (const [peerId, vote] of leftVoteEntries) {
+			if (rightVotes[peerId] !== vote) return false;
+		}
+	}
+
+	return true;
 }
 
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
@@ -247,10 +290,10 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 		register.mutate({
 			peerId: profile.username,
 			ip: "client",
-			metadata: { incidents, chatLogs },
+			metadata: { incidents, chatLogs, incidentVotes },
 		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [incidents, chatLogs, profile]);
+	}, [incidents, chatLogs, incidentVotes, profile]);
 
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
@@ -301,9 +344,9 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
 
-		setIncidents((prev) => {
+		setIncidentVotes((prev) => {
 			let changed = false;
-			let updated = prev;
+			const next = { ...prev };
 
 			for (const message of incomingMessages) {
 				if (message.from === profile.username) continue;
@@ -326,35 +369,71 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 					const voterId = payload.data?.voterId ?? message.from;
 					const vote = payload.data?.vote === -1 ? -1 : 1;
 
-					let incidentUpdated = false;
-					const next = updated.map((incident) => {
-						if (incident.id !== incidentId) return incident;
-						incidentUpdated = true;
-						return {
-							...incident,
-							votes: {
-								...(incident.votes ?? {}),
-								[voterId]: vote,
-							},
-						};
-					});
+					const existing = next[incidentId] ?? {};
+					if (existing[voterId] === vote) continue;
 
-					if (incidentUpdated) {
-						updated = next;
-						changed = true;
-					}
+					next[incidentId] = {
+						...existing,
+						[voterId]: vote,
+					};
+					changed = true;
 				} catch {
 					/* */
 				}
 			}
 
-			if (changed) {
-				localStorage.setItem("gd_incidents", JSON.stringify(updated));
-				return updated;
-			}
-			return prev;
+			return changed ? next : prev;
 		});
 	}, [incomingMessages, profile]);
+
+	useEffect(() => {
+		if (!peers || !profile) return;
+
+		const peerSnapshots = peers.flatMap((peer) =>
+			((peer.metadata?.incidents as Incident[]) ?? []).map((incident) => ({
+				...incident,
+				author: peer.peerId,
+			})),
+		);
+
+		setIncidents((prev) => {
+			const merged = mergeIncidentSnapshots(prev, peerSnapshots);
+			if (incidentsAreEqual(prev, merged)) return prev;
+			localStorage.setItem("gd_incidents", JSON.stringify(merged));
+			return merged;
+		});
+
+		setIncidentVotes((prev) => {
+			let changed = false;
+			const next = { ...prev };
+
+			for (const peer of peers) {
+				const peerVotes = peer.metadata?.incidentVotes as
+					| Record<string, Record<string, VoteValue>>
+					| undefined;
+				if (!peerVotes) continue;
+
+				for (const [incidentId, votes] of Object.entries(peerVotes)) {
+					const mergedVotes = mergeVotes(next[incidentId], votes);
+					const currentVotes = next[incidentId] ?? {};
+					if (
+						Object.keys(currentVotes).length === Object.keys(mergedVotes).length &&
+						Object.entries(mergedVotes).every(
+							([peerId, vote]) => currentVotes[peerId] === vote,
+						)
+					) {
+						continue;
+					}
+
+					next[incidentId] = mergedVotes;
+					changed = true;
+				}
+			}
+
+			if (!changed) return prev;
+			return next;
+		});
+	}, [peers, profile]);
 
 	// Merge chat history from peer metadata; skip self to avoid duplicates
 	useEffect(() => {
@@ -420,19 +499,19 @@ function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
 	const selectedInc = feed.find((i) => i.id === selected) ?? null;
 	const activeChat = selected ? (chatLogs[selected] ?? []) : [];
 	const getVisibleVotes = (incident: Incident) => ({
-		...(incident.votes ?? {}),
-		...(profile?.username && voteOverrides[incident.id]
-			? { [profile.username]: voteOverrides[incident.id] }
-			: {}),
+		...mergeVotes(incident.votes, incidentVotes[incident.id]),
 	});
 
 	const handleVote = async (incident: Incident, vote: VoteValue) => {
 		if (!profile) return;
 
 		flushSync(() => {
-			setVoteOverrides((prev) => ({
+			setIncidentVotes((prev) => ({
 				...prev,
-				[incident.id]: vote,
+				[incident.id]: {
+					...(prev[incident.id] ?? {}),
+					[profile.username]: vote,
+				},
 			}));
 			setIncidents((prev) => {
 				const updated = prev.map((item) =>
