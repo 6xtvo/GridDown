@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import MapGL, { Layer, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { z } from "zod";
@@ -84,8 +85,12 @@ export type Incident = {
 	loc: string;
 	author: string;
 	time: string;
+	votes?: Record<string, 1 | -1>;
 };
 
+type VoteValue = 1 | -1;
+
+// msgId for exact dedup; image for optional photo attachments
 type ChatMsg = {
 	from: string;
 	image?: string | null;
@@ -137,6 +142,9 @@ export function TacticalDashboard() {
 	const chatFileRef = useRef<HTMLInputElement>(null);
 
 	const [incidents, setIncidents] = useState<Incident[]>([]);
+	const [voteOverrides, setVoteOverrides] = useState<Record<string, VoteValue>>(
+		{},
+	);
 	const [selected, setSelected] = useState<string | null>(null);
 	const [route, setRoute] = useState<RouteState | null>(null);
 	const [routing, setRouting] = useState(false);
@@ -190,7 +198,66 @@ export function TacticalDashboard() {
 			msgId: getChatMessageId(room, message, index),
 		}));
 
-	// ─── Effects ──────────────────────────────────────────────────────────────
+	const readPersistedChats = () => {
+		const savedChat = localStorage.getItem("gd_chats");
+		if (!savedChat) return {} as Record<string, ChatMsg[]>;
+		const parsed = JSON.parse(savedChat) as Record<string, ChatMsg[]>;
+		return Object.fromEntries(
+			Object.entries(parsed).map(([room, messages]) => [
+				room,
+				normalizeChatThread(room, messages),
+			]),
+		) as Record<string, ChatMsg[]>;
+	};
+
+	const base = profile ?? DEFAULT_LOCATION;
+
+	function getVoteTotals(votes?: Record<string, VoteValue>) {
+		const values = Object.values(votes ?? {});
+		return {
+			upvotes: values.filter((vote) => vote === 1).length,
+			downvotes: values.filter((vote) => vote === -1).length,
+		};
+	}
+
+	function mergeIncidentSnapshots(base: Incident[], snapshots: Incident[]) {
+		const merged = new Map<string, Incident>();
+		const upsert = (incident: Incident) => {
+			const existing = merged.get(incident.id);
+			if (!existing) {
+				merged.set(incident.id, {
+					...incident,
+					votes: { ...(incident.votes ?? {}) },
+				});
+				return;
+			}
+
+			merged.set(incident.id, {
+				...existing,
+				...incident,
+				votes: {
+					...(existing.votes ?? {}),
+					...(incident.votes ?? {}),
+				},
+			});
+		};
+
+		base.forEach(upsert);
+		snapshots.forEach(upsert);
+		return [...merged.values()];
+	}
+
+	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
+		refetchInterval: 3000,
+		enabled: mounted,
+	});
+	const register = api.p2p.register.useMutation();
+	const sendMessage = api.p2p.sendMessage.useMutation();
+	const { data: incomingMessages } = api.p2p.getMessages.useQuery(
+		{ peerId: profile?.username ?? "" },
+		{ refetchInterval: 2000, enabled: mounted && !!profile },
+	);
+
 	useEffect(() => {
 		setMounted(true);
 		const saved = localStorage.getItem("gd_profile");
@@ -267,7 +334,65 @@ export function TacticalDashboard() {
 		});
 	}, [incomingMessages, profile]);
 
-	// Merge chat history from peer metadata
+	useEffect(() => {
+		if (!incomingMessages?.length || !profile) return;
+
+		setIncidents((prev) => {
+			let changed = false;
+			let updated = prev;
+
+			for (const message of incomingMessages) {
+				if (message.from === profile.username) continue;
+
+				try {
+					const payload = JSON.parse(String(message.data)) as {
+						type?: string;
+						data?: {
+							incidentId?: string;
+							vote?: VoteValue;
+							voterId?: string;
+						};
+					};
+
+					if (payload.type !== "INCIDENT_VOTE") continue;
+
+					const incidentId = payload.data?.incidentId;
+					if (!incidentId) continue;
+
+					const voterId = payload.data?.voterId ?? message.from;
+					const vote = payload.data?.vote === -1 ? -1 : 1;
+
+					let incidentUpdated = false;
+					const next = updated.map((incident) => {
+						if (incident.id !== incidentId) return incident;
+						incidentUpdated = true;
+						return {
+							...incident,
+							votes: {
+								...(incident.votes ?? {}),
+								[voterId]: vote,
+							},
+						};
+					});
+
+					if (incidentUpdated) {
+						updated = next;
+						changed = true;
+					}
+				} catch {
+					/* */
+				}
+			}
+
+			if (changed) {
+				localStorage.setItem("gd_incidents", JSON.stringify(updated));
+				return updated;
+			}
+			return prev;
+		});
+	}, [incomingMessages, profile]);
+
+	// Merge chat history from peer metadata; skip self to avoid duplicates
 	useEffect(() => {
 		if (!peers || !profile) return;
 		setChatLogs((prev) => {
@@ -306,14 +431,18 @@ export function TacticalDashboard() {
 		chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [chatLogs, selected, rightPanel]);
 
-	// ─── Feed ─────────────────────────────────────────────────────────────────
-	const feed: Incident[] = [...incidents];
-	peers?.forEach((p) => {
-		((p.metadata?.incidents as Incident[]) ?? []).forEach((inc) => {
-			if (!feed.find((e) => e.id === inc.id))
-				feed.push({ ...inc, author: p.peerId });
-		});
-	});
+	// Build merged feed
+	let feed: Incident[] = [...incidents];
+	if (peers) {
+		const peerSnapshots = peers.flatMap((p) =>
+			((p.metadata?.incidents as Incident[]) ?? []).map((inc) => ({
+				...inc,
+				author: p.peerId,
+			})),
+		);
+		feed = mergeIncidentSnapshots(feed, peerSnapshots);
+	}
+	const w: Record<string, number> = { HIGH: 3, MED: 2, LOW: 1 };
 	feed.sort((a, b) => {
 		const pDiff =
 			(PRIORITY_WEIGHT[b.priority] ?? 0) - (PRIORITY_WEIGHT[a.priority] ?? 0);
@@ -327,7 +456,6 @@ export function TacticalDashboard() {
 	const selectedInc = feed.find((i) => i.id === selected) ?? null;
 	const activeChat = selected ? (chatLogs[selected] ?? []) : [];
 
-	// ─── Handlers ─────────────────────────────────────────────────────────────
 	const handleSelect = async (inc: Incident) => {
 		if (selected === inc.id && rightPanel === "map") {
 			setSelected(null);
@@ -714,18 +842,71 @@ export function TacticalDashboard() {
 													<span className="text-[9px] text-white/35">
 														{timeAgo(inc.time)}
 													</span>
-													<span
-														className="shrink-0 text-[9px] tracking-widest"
-														style={{
-															color: PRIORITY_DOT[inc.priority],
-															opacity: 0.8,
-														}}
-													>
-														{inc.priority}
-													</span>
-													<span className="ml-auto text-[9px] text-white/40">
-														{haversine(base.lat, base.lng, inc.lat, inc.lng)}km
-													</span>
+													<div className="ml-auto flex items-center gap-2">
+														<span
+															className="shrink-0 text-[9px] tracking-widest"
+															style={{
+																color: PRIORITY_DOT[inc.priority],
+																opacity: 0.8,
+															}}
+														>
+															{inc.priority}
+														</span>
+														<span className="text-[9px] text-white/40">
+															{haversine(base.lat, base.lng, inc.lat, inc.lng)}
+															km
+														</span>
+														{(() => {
+															const visibleVotes = getVisibleVotes(inc);
+															const { upvotes, downvotes } =
+																getVoteTotals(visibleVotes);
+															const currentVote =
+																profile?.username && visibleVotes
+																	? visibleVotes[profile.username]
+																	: undefined;
+
+															return (
+																<>
+																	<button
+																		className="rounded border px-2 py-0.5 text-[9px]"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			void handleVote(inc, 1);
+																		}}
+																		style={{
+																			borderColor: "rgba(34,197,94,0.18)",
+																			color:
+																				currentVote === 1
+																					? "#4ade80"
+																					: "rgba(74,222,128,0.65)",
+																			background: "rgba(34,197,94,0.04)",
+																		}}
+																		type="button"
+																	>
+																		▲ {upvotes}
+																	</button>
+																	<button
+																		className="rounded border px-2 py-0.5 text-[9px]"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			void handleVote(inc, -1);
+																		}}
+																		style={{
+																			borderColor: "rgba(239,68,68,0.18)",
+																			color:
+																				currentVote === -1
+																					? "#f87171"
+																					: "rgba(248,113,113,0.65)",
+																			background: "rgba(239,68,68,0.04)",
+																		}}
+																		type="button"
+																	>
+																		▼ {downvotes}
+																	</button>
+																</>
+															);
+														})()}
+													</div>
 												</div>
 											</div>
 										</div>
