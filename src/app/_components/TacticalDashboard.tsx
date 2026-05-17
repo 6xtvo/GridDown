@@ -6,7 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { z } from "zod";
 import { api } from "@/trpc/react";
 
-// ─── Skill definitions ────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 const SKILL_OPTIONS = [
 	"Medic",
 	"Field Surgery",
@@ -30,20 +30,29 @@ const SKILL_OPTIONS = [
 	"IT / Comms",
 ] as const;
 
-function timeAgo(dateStr: string): string {
-	// incidents store time as a locale time string e.g. "2:34:05 PM"
-	// we compare against today's date + that time
-	const now = Date.now();
-	const today = new Date().toDateString();
-	const parsed = new Date(`${today} ${dateStr}`).getTime();
-	const diff = Math.floor((now - parsed) / 1000);
-	if (diff < 60) return "just now";
-	if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-	if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-	return `${Math.floor(diff / 86400)}d ago`;
-}
-
 type Skill = (typeof SKILL_OPTIONS)[number];
+
+const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
+
+const PRIORITY_DOT: Record<string, string> = {
+	HIGH: "#ef4444",
+	MED: "#f59e0b",
+	LOW: "#52525b",
+};
+
+const TYPE_LABEL: Record<string, string> = {
+	REQUEST: "REQUEST",
+	OFFER: "OFFER",
+	ANNOUNCE: "ANNOUNCEMENT",
+};
+
+const TYPE_COLOR: Record<string, string> = {
+	REQUEST: "#ef4444",
+	OFFER: "#3b82f6",
+	ANNOUNCE: "#22c55e",
+};
+
+const PRIORITY_WEIGHT: Record<string, number> = { HIGH: 3, MED: 2, LOW: 1 };
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 const profileSchema = z.object({
@@ -77,7 +86,6 @@ export type Incident = {
 	time: string;
 };
 
-// msgId for exact dedup; image for optional photo attachments
 type ChatMsg = {
 	from: string;
 	image?: string | null;
@@ -85,28 +93,10 @@ type ChatMsg = {
 	time: number;
 	msgId: string;
 };
+
 type RouteState = { geojson: GeoJSON.LineString; eta: number };
 
-const DEFAULT_LOCATION = { lat: 51.5007, lng: -0.1246 };
-
-const PRIORITY_DOT: Record<string, string> = {
-	HIGH: "#ef4444",
-	MED: "#f59e0b",
-	LOW: "#52525b",
-};
-
-const TYPE_LABEL: Record<string, string> = {
-	REQUEST: "REQUEST",
-	OFFER: "OFFER",
-	ANNOUNCE: "ANNOUNCEMENT",
-};
-
-const TYPE_COLOR: Record<string, string> = {
-	REQUEST: "#ef4444",
-	OFFER: "#3b82f6",
-	ANNOUNCE: "#22c55e",
-};
-
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
 	const R = 6371;
 	const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -117,6 +107,16 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
 			Math.cos((lat2 * Math.PI) / 180) *
 			Math.sin(dLon / 2) ** 2;
 	return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(1);
+}
+
+function timeAgo(dateStr: string): string {
+	const now = Date.now();
+	const parsed = new Date(`${new Date().toDateString()} ${dateStr}`).getTime();
+	const diff = Math.floor((now - parsed) / 1000);
+	if (diff < 60) return "just now";
+	if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+	if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+	return `${Math.floor(diff / 86400)}d ago`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -141,7 +141,6 @@ export function TacticalDashboard() {
 	const [route, setRoute] = useState<RouteState | null>(null);
 	const [routing, setRouting] = useState(false);
 
-	// right panel: "map" | "chat"
 	const [rightPanel, setRightPanel] = useState<"map" | "chat">("map");
 	const [chatLogs, setChatLogs] = useState<Record<string, ChatMsg[]>>({});
 	const [chatInput, setChatInput] = useState("");
@@ -162,6 +161,21 @@ export function TacticalDashboard() {
 	const [obErrors, setObErrors] = useState<ProfileErrors>({});
 	const [skillSearch, setSkillSearch] = useState("");
 
+	const base = profile ?? DEFAULT_LOCATION;
+
+	// ─── tRPC ─────────────────────────────────────────────────────────────────
+	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
+		refetchInterval: 3000,
+		enabled: mounted,
+	});
+	const register = api.p2p.register.useMutation();
+	const sendMessage = api.p2p.sendMessage.useMutation();
+	const { data: incomingMessages } = api.p2p.getMessages.useQuery(
+		{ peerId: profile?.username ?? "" },
+		{ refetchInterval: 2000, enabled: mounted && !!profile },
+	);
+
+	// ─── Chat helpers ─────────────────────────────────────────────────────────
 	const getChatMessageId = (
 		room: string,
 		message: { msgId?: string; time: number; from: string; text: string },
@@ -176,19 +190,7 @@ export function TacticalDashboard() {
 			msgId: getChatMessageId(room, message, index),
 		}));
 
-	const base = profile ?? DEFAULT_LOCATION;
-
-	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
-		refetchInterval: 3000,
-		enabled: mounted,
-	});
-	const register = api.p2p.register.useMutation();
-	const sendMessage = api.p2p.sendMessage.useMutation();
-	const { data: incomingMessages } = api.p2p.getMessages.useQuery(
-		{ peerId: profile?.username ?? "" },
-		{ refetchInterval: 2000, enabled: mounted && !!profile },
-	);
-
+	// ─── Effects ──────────────────────────────────────────────────────────────
 	useEffect(() => {
 		setMounted(true);
 		const saved = localStorage.getItem("gd_profile");
@@ -209,6 +211,7 @@ export function TacticalDashboard() {
 		}
 	}, []);
 
+	// Register presence whenever state changes
 	useEffect(() => {
 		if (!mounted || !profile) return;
 		register.mutate({
@@ -219,14 +222,14 @@ export function TacticalDashboard() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [incidents, chatLogs, profile]);
 
+	// Ingest incoming direct messages
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
 		setChatLogs((prev) => {
 			const updated = { ...prev };
 			let changed = false;
 			incomingMessages.forEach((m) => {
-				// FIX: skip messages we sent ourselves — they're already in local state
-				if (m.from === profile.username) return;
+				if (m.from === profile.username) return; // skip own messages
 				try {
 					const p = JSON.parse(String(m.data));
 					if (p.type !== "INCIDENT_CHAT") return;
@@ -242,7 +245,6 @@ export function TacticalDashboard() {
 						updated[room]?.length ?? 0,
 					);
 					if (!updated[room]) updated[room] = [];
-					// FIX: deduplicate by msgId instead of timestamp
 					if (!updated[room].some((x) => x.msgId === msgId)) {
 						updated[room].push({
 							from: m.from,
@@ -254,7 +256,7 @@ export function TacticalDashboard() {
 						changed = true;
 					}
 				} catch {
-					/* */
+					/* malformed message — ignore */
 				}
 			});
 			if (changed) {
@@ -265,7 +267,7 @@ export function TacticalDashboard() {
 		});
 	}, [incomingMessages, profile]);
 
-	// Merge chat history from peer metadata; skip self to avoid duplicates
+	// Merge chat history from peer metadata
 	useEffect(() => {
 		if (!peers || !profile) return;
 		setChatLogs((prev) => {
@@ -279,10 +281,7 @@ export function TacticalDashboard() {
 						ChatMsg[]
 					>;
 					Object.entries(peerChats).forEach(([roomId, msgs]) => {
-						const room: ChatMsg[] = normalizeChatThread(
-							roomId,
-							merged[roomId] ?? [],
-						);
+						const room = normalizeChatThread(roomId, merged[roomId] ?? []);
 						const peerThread = normalizeChatThread(roomId, msgs);
 						const dedupedRoom = [...room];
 						peerThread.forEach((msg) => {
@@ -302,32 +301,33 @@ export function TacticalDashboard() {
 		});
 	}, [peers, profile]);
 
+	// Scroll chat to bottom on new messages
 	useEffect(() => {
 		chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [chatLogs, selected, rightPanel]);
 
-	// Build merged feed
+	// ─── Feed ─────────────────────────────────────────────────────────────────
 	const feed: Incident[] = [...incidents];
-	if (peers) {
-		peers.forEach((p) => {
-			((p.metadata?.incidents as Incident[]) ?? []).forEach((inc) => {
-				if (!feed.find((e) => e.id === inc.id))
-					feed.push({ ...inc, author: p.peerId });
-			});
+	peers?.forEach((p) => {
+		((p.metadata?.incidents as Incident[]) ?? []).forEach((inc) => {
+			if (!feed.find((e) => e.id === inc.id))
+				feed.push({ ...inc, author: p.peerId });
 		});
-	}
-	const w: Record<string, number> = { HIGH: 3, MED: 2, LOW: 1 };
+	});
 	feed.sort((a, b) => {
-		const pDiff = (w[b.priority] ?? 0) - (w[a.priority] ?? 0);
+		const pDiff =
+			(PRIORITY_WEIGHT[b.priority] ?? 0) - (PRIORITY_WEIGHT[a.priority] ?? 0);
 		if (pDiff !== 0) return pDiff;
-		const distA = parseFloat(haversine(base.lat, base.lng, a.lat, a.lng));
-		const distB = parseFloat(haversine(base.lat, base.lng, b.lat, b.lng));
-		return distA - distB;
+		return (
+			parseFloat(haversine(base.lat, base.lng, a.lat, a.lng)) -
+			parseFloat(haversine(base.lat, base.lng, b.lat, b.lng))
+		);
 	});
 
 	const selectedInc = feed.find((i) => i.id === selected) ?? null;
 	const activeChat = selected ? (chatLogs[selected] ?? []) : [];
 
+	// ─── Handlers ─────────────────────────────────────────────────────────────
 	const handleSelect = async (inc: Incident) => {
 		if (selected === inc.id && rightPanel === "map") {
 			setSelected(null);
@@ -349,7 +349,7 @@ export function TacticalDashboard() {
 					eta: Math.ceil(d.routes[0].duration / 60),
 				});
 		} catch {
-			/* */
+			/* routing failed — silent */
 		} finally {
 			setRouting(false);
 		}
@@ -370,10 +370,8 @@ export function TacticalDashboard() {
 		setChatInput("");
 		setChatImage(null);
 		const now = Date.now();
-		// FIX: generate a unique msgId so every dedup check across all effects is exact
 		const msgId = Math.random().toString(36).slice(2, 11);
 
-		// Add to local log immediately
 		setChatLogs((prev) => {
 			const updated = {
 				...prev,
@@ -389,17 +387,13 @@ export function TacticalDashboard() {
 		if (peers && (text || image)) {
 			const payload = JSON.stringify({
 				type: "INCIDENT_CHAT",
-				// FIX: include msgId in the broadcast payload
 				data: { incidentId: selected, text, image: image ?? null, msgId },
 			});
-
-			// FIX: deduplicate peers by peerId before broadcasting
 			const uniquePeers = peers
 				.filter((p) => p.peerId !== profile.username)
 				.filter(
 					(p, i, arr) => arr.findIndex((x) => x.peerId === p.peerId) === i,
 				);
-
 			await Promise.all(
 				uniquePeers.map((p) =>
 					sendMessage.mutateAsync({
@@ -453,13 +447,11 @@ export function TacticalDashboard() {
 	const handleSaveProfile = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!hqDraft) return;
-
 		const parsed = profileSchema.safeParse({
 			username: obUsername,
 			age: obAge === "" ? undefined : Number(obAge),
 			skills: obSkills,
 		});
-
 		if (!parsed.success) {
 			const errs: ProfileErrors = {};
 			parsed.error.errors.forEach((err) => {
@@ -469,7 +461,6 @@ export function TacticalDashboard() {
 			setObErrors(errs);
 			return;
 		}
-
 		setObErrors({});
 		const p = {
 			username: parsed.data.username.toUpperCase(),
@@ -484,6 +475,7 @@ export function TacticalDashboard() {
 
 	if (!mounted) return null;
 
+	// ─── Render ───────────────────────────────────────────────────────────────
 	return (
 		<>
 			<style>{`
@@ -499,12 +491,13 @@ export function TacticalDashboard() {
       `}</style>
 
 			<div className="gd flex h-screen flex-col overflow-hidden bg-[#0c0c0c] text-white">
-				{/* ── Header ───────────────────────────────────────── */}
+				{/* ── Header ──────────────────────────────────────────────────────── */}
 				<header className="flex shrink-0 items-center justify-between border-b border-white/6 px-6 py-3.5">
 					<div className="flex items-center gap-4">
 						<span className="text-base font-medium tracking-widest text-red-500">
 							GRIDDOWN
 						</span>
+
 						<div className="flex items-center gap-1.5">
 							<span className="gd-live h-1.5 w-1.5 rounded-full bg-red-500" />
 							<span className="text-[10px] tracking-[0.2em] text-white/40">
@@ -512,8 +505,8 @@ export function TacticalDashboard() {
 							</span>
 						</div>
 
-						{/* ── stat chips ── */}
 						<div className="h-3 w-px bg-white/8" />
+
 						<div className="flex items-center gap-1.5">
 							<span
 								className="gd-live h-1.5 w-1.5 rounded-full bg-green-400"
@@ -523,7 +516,9 @@ export function TacticalDashboard() {
 								{(peers?.length ?? 0) + (profile ? 1 : 0)} ONLINE
 							</span>
 						</div>
+
 						<div className="h-3 w-px bg-white/8" />
+
 						<span className="text-[10px] tracking-[0.2em] text-white/40">
 							{
 								feed.filter(
@@ -533,6 +528,7 @@ export function TacticalDashboard() {
 							HIGH PRIORITY
 						</span>
 					</div>
+
 					<div className="flex items-center gap-5">
 						{profile ? (
 							<>
@@ -562,9 +558,9 @@ export function TacticalDashboard() {
 					</div>
 				</header>
 
-				{/* ── Body ─────────────────────────────────────────── */}
+				{/* ── Body ────────────────────────────────────────────────────────── */}
 				<div className="flex flex-1 overflow-hidden">
-					{/* ── Left: Post + Feed ──────────────────────────── */}
+					{/* ── Left panel: post form + feed ──────────────────────────────── */}
 					<div className="flex w-96 shrink-0 flex-col border-r border-white/6">
 						{/* Post form */}
 						<div className="shrink-0 border-b border-white/6 p-4">
@@ -692,11 +688,13 @@ export function TacticalDashboard() {
 								>
 									<div className="px-4 py-3.5">
 										<div className="flex items-start gap-2.5">
+											{/* Priority dot */}
 											<span
 												className="mt-1.25 h-1.5 w-1.5 shrink-0 rounded-full"
 												style={{ background: PRIORITY_DOT[inc.priority] }}
 											/>
 											<div className="min-w-0 flex-1">
+												{/* Type label + message */}
 												<div className="mb-1 flex items-center gap-2">
 													<span
 														className="shrink-0 text-[9px] tracking-widest"
@@ -708,12 +706,13 @@ export function TacticalDashboard() {
 														{inc.msg}
 													</span>
 												</div>
+												{/* Meta row */}
 												<div className="flex items-center gap-3">
 													<span className="text-[9px] text-white/40">
 														{inc.author}
 													</span>
 													<span className="text-[9px] text-white/35">
-														{inc.time} ({timeAgo(inc.time)})
+														{timeAgo(inc.time)}
 													</span>
 													<span
 														className="shrink-0 text-[9px] tracking-widest"
@@ -725,8 +724,7 @@ export function TacticalDashboard() {
 														{inc.priority}
 													</span>
 													<span className="ml-auto text-[9px] text-white/40">
-														{haversine(base.lat, base.lng, inc.lat, inc.lng)}
-														km
+														{haversine(base.lat, base.lng, inc.lat, inc.lng)}km
 													</span>
 												</div>
 											</div>
@@ -736,7 +734,7 @@ export function TacticalDashboard() {
 										{selected === inc.id && (
 											<div className="gd-in mt-3 flex items-center gap-2 pl-4">
 												{routing && (
-													<span className="text-[9px] text-amber-400/60 gd-live">
+													<span className="gd-live text-[9px] text-amber-400/60">
 														routing…
 													</span>
 												)}
@@ -782,10 +780,10 @@ export function TacticalDashboard() {
 						</div>
 					</div>
 
-					{/* ── Right: Map or Chat ─────────────────────────── */}
+					{/* ── Right panel: map or chat ───────────────────────────────────── */}
 					<div className="relative flex flex-1 flex-col overflow-hidden">
 						{rightPanel === "chat" && selectedInc ? (
-							/* Chat */
+							/* Chat view */
 							<div className="flex h-full flex-col">
 								<div className="flex shrink-0 items-center justify-between border-b border-white/6 px-5 py-3.5">
 									<div>
@@ -805,7 +803,7 @@ export function TacticalDashboard() {
 										</p>
 									</div>
 									<button
-										className="px-3 py-1.5 text-[10px] tracking-widest text-white/50  transition-colors hover:text-white/55"
+										className="px-3 py-1.5 text-[10px] tracking-widest text-white/50 transition-colors hover:text-white/55"
 										onClick={() => setRightPanel("map")}
 										style={{ border: "1px solid rgba(255,255,255,0.2)" }}
 									>
@@ -930,7 +928,7 @@ export function TacticalDashboard() {
 								</form>
 							</div>
 						) : (
-							/* Map */
+							/* Map view */
 							<div className="relative h-full w-full">
 								<MapGL
 									attributionControl={false}
@@ -949,6 +947,7 @@ export function TacticalDashboard() {
 										cursor: postStep === "map" ? "crosshair" : "default",
 									}}
 								>
+									{/* Route line */}
 									{route && (
 										<Source data={route.geojson} id="route" type="geojson">
 											<Layer
@@ -964,6 +963,7 @@ export function TacticalDashboard() {
 										</Source>
 									)}
 
+									{/* Own location marker */}
 									<Marker
 										anchor="center"
 										latitude={base.lat}
@@ -978,6 +978,7 @@ export function TacticalDashboard() {
 										</div>
 									</Marker>
 
+									{/* Incident markers */}
 									{feed.map((inc) => {
 										const color = TYPE_COLOR[inc.type] ?? "#ef4444";
 										const isActive = selected === inc.id;
@@ -1020,6 +1021,7 @@ export function TacticalDashboard() {
 										);
 									})}
 
+									{/* Post pin preview */}
 									{postCoord && (
 										<Marker
 											anchor="center"
@@ -1101,7 +1103,7 @@ export function TacticalDashboard() {
 								{/* Pin location hint */}
 								{postStep === "map" && (
 									<div
-										className="gd-in pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2"
+										className="gd-in pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 px-4 py-2"
 										style={{
 											background: "rgba(12,12,12,0.9)",
 											border: "1px solid rgba(251,191,36,0.25)",
@@ -1119,7 +1121,7 @@ export function TacticalDashboard() {
 				</div>
 			</div>
 
-			{/* ── Onboarding modal ─────────────────────────────── */}
+			{/* ── Onboarding modal ──────────────────────────────────────────────── */}
 			{showOnboard && (
 				<div className="gd fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
 					<form
@@ -1134,18 +1136,18 @@ export function TacticalDashboard() {
 						}}
 					>
 						<h2 className="mb-1 text-sm tracking-[0.25em] text-white/60">
-							OPERATOR PROFILE
+							YOUR PROFILE
 						</h2>
 						<p className="mb-6 text-[10px] text-white/40">
-							Set your name to join the mesh.
+							Set your name to get started.
 						</p>
 
 						<div className="flex flex-col gap-5">
-							{/* ── Callsign ── */}
+							{/* Name */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
 									<span className="text-[9px] tracking-[0.25em] text-white/50">
-										CALLSIGN
+										NAME
 									</span>
 									{obErrors.username && (
 										<span className="text-[9px] text-red-500/70">
@@ -1154,12 +1156,12 @@ export function TacticalDashboard() {
 									)}
 								</label>
 								<input
-									className="w-full bg-transparent px-3 py-2.5 text-[12px] text-white/75 outline-none placeholder:text-white/15 uppercase transition-colors focus:bg-white/3"
+									className="w-full bg-transparent px-3 py-2.5 text-[12px] uppercase text-white/75 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
 									onChange={(e) => {
 										setObUsername(e.target.value.toUpperCase());
 										setObErrors((prev) => ({ ...prev, username: undefined }));
 									}}
-									placeholder="e.g. DELTA-7"
+									placeholder="e.g. ALEX"
 									style={{
 										border: `1px solid ${obErrors.username ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.2)"}`,
 									}}
@@ -1167,7 +1169,7 @@ export function TacticalDashboard() {
 								/>
 							</div>
 
-							{/* ── Age ── */}
+							{/* Age */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
 									<span className="text-[9px] tracking-[0.25em] text-white/50">
@@ -1196,7 +1198,7 @@ export function TacticalDashboard() {
 								/>
 							</div>
 
-							{/* ── Skills pill selector ── */}
+							{/* Skills */}
 							<div>
 								<label className="mb-1.5 flex items-center justify-between">
 									<span className="text-[9px] tracking-[0.25em] text-white/50">
@@ -1209,7 +1211,6 @@ export function TacticalDashboard() {
 									)}
 								</label>
 
-								{/* Selected pills */}
 								{obSkills.length > 0 && (
 									<div
 										className="mb-2 flex flex-wrap gap-1.5 p-2"
@@ -1239,7 +1240,6 @@ export function TacticalDashboard() {
 									</div>
 								)}
 
-								{/* Search + options */}
 								<input
 									className="mb-2 w-full bg-transparent px-3 py-2 text-[11px] text-white/60 outline-none placeholder:text-white/15 transition-colors focus:bg-white/3"
 									onChange={(e) => setSkillSearch(e.target.value)}
@@ -1276,10 +1276,11 @@ export function TacticalDashboard() {
 								</div>
 							</div>
 
-							{/* ── HQ map ── */}
+							{/* Location */}
 							<div>
 								<label className="mb-1.5 block text-[9px] tracking-[0.25em] text-white/50">
-									LOCATION <span className="text-white/15">(click map)</span>
+									YOUR LOCATION{" "}
+									<span className="text-white/15">(click map)</span>
 								</label>
 								<div
 									className="relative overflow-hidden"
@@ -1341,7 +1342,7 @@ export function TacticalDashboard() {
 								}}
 								type="submit"
 							>
-								JOIN MESH
+								JOIN
 							</button>
 						</div>
 					</form>

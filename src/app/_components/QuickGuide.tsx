@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+// ─── Step definitions ─────────────────────────────────────────────────────────
 const STEPS = [
 	{
 		num: "01",
@@ -53,6 +54,14 @@ const STEPS = [
 	},
 ];
 
+const CORNER_CLASSES = [
+	"top-0 left-0 border-t border-l",
+	"top-0 right-0 border-t border-r",
+	"bottom-0 left-0 border-b border-l",
+	"bottom-0 right-0 border-b border-r",
+] as const;
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export function QuickGuide() {
 	const [isOpen, setIsOpen] = useState(false);
 	const [activeStep, setActiveStep] = useState<number | null>(null);
@@ -65,6 +74,10 @@ export function QuickGuide() {
         @keyframes qg-ping { 75%, 100% { transform: scale(1.8); opacity: 0; } }
       `}</style>
 
+			{/*
+        Entire widget slides as one unit. When closed, translateX(300px) hides
+        the panel off-screen while the tab (28px wide) stays visible at the edge.
+      */}
 			<div
 				className="qg fixed right-0 z-50 flex items-center"
 				style={{
@@ -73,7 +86,7 @@ export function QuickGuide() {
 					transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
 				}}
 			>
-				{/* ── TAB ── */}
+				{/* ── Tab ── */}
 				<button
 					onClick={() => setIsOpen((v) => !v)}
 					style={{
@@ -102,7 +115,7 @@ export function QuickGuide() {
 					{isOpen ? "CLOSE" : "GUIDE"}
 				</button>
 
-				{/* ── PANEL ── */}
+				{/* ── Panel ── */}
 				<div
 					className="relative overflow-hidden"
 					style={{
@@ -114,7 +127,7 @@ export function QuickGuide() {
 							"-8px 0 32px rgba(0,0,0,0.7), 0 0 0 1px rgba(220,38,38,0.04)",
 					}}
 				>
-					{/* scanlines */}
+					{/* Scanlines overlay */}
 					<div
 						className="pointer-events-none absolute inset-0 z-20"
 						style={{
@@ -123,7 +136,7 @@ export function QuickGuide() {
 						}}
 					/>
 
-					{/* top glow line */}
+					{/* Top glow line */}
 					<div
 						className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px"
 						style={{
@@ -132,15 +145,8 @@ export function QuickGuide() {
 						}}
 					/>
 
-					{/* corner accents */}
-					{(
-						[
-							"top-0 left-0 border-t border-l",
-							"top-0 right-0 border-t border-r",
-							"bottom-0 left-0 border-b border-l",
-							"bottom-0 right-0 border-b border-r",
-						] as const
-					).map((c) => (
+					{/* Corner accents */}
+					{CORNER_CLASSES.map((c) => (
 						<div
 							className={`pointer-events-none absolute z-20 h-3 w-3 ${c}`}
 							key={c}
@@ -158,6 +164,7 @@ export function QuickGuide() {
 						}}
 					>
 						<div className="flex items-center gap-3">
+							{/* Pulsing dot */}
 							<span className="relative flex h-2 w-2 items-center justify-center">
 								<span
 									className="absolute h-full w-full rounded-full bg-red-500 opacity-70"
@@ -197,6 +204,7 @@ export function QuickGuide() {
 									type="button"
 								>
 									<div className="flex items-center gap-3 px-3 py-2.5">
+										{/* Step number badge */}
 										<div
 											className="flex h-5 w-8 shrink-0 items-center justify-center text-[10px] tracking-widest transition-all duration-200"
 											style={{
@@ -207,14 +215,20 @@ export function QuickGuide() {
 										>
 											{s.num}
 										</div>
+
+										{/* Colour dot */}
 										<span
 											className={`h-1 w-1 shrink-0 rounded-full transition-opacity duration-200 ${s.dot} ${open ? "opacity-100" : "opacity-40"}`}
 										/>
+
+										{/* Label */}
 										<span
 											className={`flex-1 text-[10px] tracking-[0.22em] transition-colors duration-200 ${open ? s.textClass : "text-zinc-400"}`}
 										>
 											{s.label}
 										</span>
+
+										{/* Chevron */}
 										<svg
 											className={`shrink-0 transition-all duration-200 ${open ? s.textClass : "text-zinc-500"}`}
 											fill="none"
@@ -234,6 +248,8 @@ export function QuickGuide() {
 											/>
 										</svg>
 									</div>
+
+									{/* Expandable description */}
 									<div
 										style={{
 											maxHeight: open ? "140px" : "0",
@@ -256,7 +272,7 @@ export function QuickGuide() {
 						})}
 					</div>
 
-					{/* Footer */}
+					{/* Footer — progress indicators */}
 					<div
 						className="flex items-center justify-end px-4 py-2"
 						style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}

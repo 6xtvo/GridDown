@@ -196,6 +196,9 @@ export const p2pRouter = createTRPCRouter({
 			return { removed };
 		}),
 
+	/**
+	 * Get info about a specific peer by ID. Returns null if not found.
+	 */
 	getPeer: publicProcedure
 		.input(z.object({ peerId: z.string() }))
 		.query(async ({ input }) => {
