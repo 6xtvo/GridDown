@@ -30,6 +30,19 @@ const SKILL_OPTIONS = [
 	"IT / Comms",
 ] as const;
 
+function timeAgo(dateStr: string): string {
+	// incidents store time as a locale time string e.g. "2:34:05 PM"
+	// we compare against today's date + that time
+	const now = Date.now();
+	const today = new Date().toDateString();
+	const parsed = new Date(`${today} ${dateStr}`).getTime();
+	const diff = Math.floor((now - parsed) / 1000);
+	if (diff < 60) return "just now";
+	if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+	if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+	return `${Math.floor(diff / 86400)}d ago`;
+}
+
 type Skill = (typeof SKILL_OPTIONS)[number];
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
@@ -700,7 +713,16 @@ export function TacticalDashboard() {
 														{inc.author}
 													</span>
 													<span className="text-[9px] text-white/35">
-														{inc.time}
+														{inc.time} ({timeAgo(inc.time)})
+													</span>
+													<span
+														className="shrink-0 text-[9px] tracking-widest"
+														style={{
+															color: PRIORITY_DOT[inc.priority],
+															opacity: 0.8,
+														}}
+													>
+														{inc.priority}
 													</span>
 													<span className="ml-auto text-[9px] text-white/40">
 														{haversine(base.lat, base.lng, inc.lat, inc.lng)}
