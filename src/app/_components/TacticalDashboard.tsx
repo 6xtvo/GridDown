@@ -269,8 +269,7 @@ export function TacticalDashboard() {
 				incident.lng !== other.lng ||
 				incident.loc !== other.loc ||
 				incident.author !== other.author ||
-				incident.time !== other.time ||
-				incident.neededBy !== other.neededBy
+				incident.time !== other.time
 			) {
 				return false;
 			}
