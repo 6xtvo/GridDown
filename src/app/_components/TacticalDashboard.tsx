@@ -402,6 +402,41 @@ export function TacticalDashboard() {
 
 	useEffect(() => {
 		if (!incomingMessages?.length || !profile) return;
+		const resolvedIncidentIds = new Set<string>();
+		for (const message of incomingMessages) {
+			if (message.from === profile.username) continue;
+			try {
+				const payload = JSON.parse(String(message.data)) as {
+					type?: string;
+					data?: { incidentId?: string };
+				};
+				if (payload.type !== "INCIDENT_RESOLVE") continue;
+				if (payload.data?.incidentId) resolvedIncidentIds.add(payload.data.incidentId);
+			} catch {
+				/* */
+			}
+		}
+		if (resolvedIncidentIds.size === 0) return;
+		setIncidents((prev) => {
+			let changed = false;
+			const next = prev.map((incident) => {
+				if (!resolvedIncidentIds.has(incident.id)) return incident;
+				changed = true;
+				return { ...incident, resolved: true };
+			});
+			if (!changed) return prev;
+			localStorage.setItem("gd_incidents", JSON.stringify(next));
+			return next;
+		});
+		if (selected && resolvedIncidentIds.has(selected)) {
+			setSelected(null);
+			setRoute(null);
+			setRightPanel("map");
+		}
+	}, [incomingMessages, profile, selected]);
+
+	useEffect(() => {
+		if (!incomingMessages?.length || !profile) return;
 		setIncidentVotes((prev) => {
 			let changed = false;
 			const next = { ...prev };
@@ -659,7 +694,7 @@ export function TacticalDashboard() {
 		setPostStep("form");
 	};
 
-	const handleResolve = (id: string) => {
+	const handleResolve = async (id: string) => {
 		const remaining = incidents.map((incident) =>
 			incident.id === id ? { ...incident, resolved: true } : incident,
 		);
@@ -674,6 +709,28 @@ export function TacticalDashboard() {
 			localStorage.setItem("gd_chats", JSON.stringify(withoutResolved));
 			return withoutResolved;
 		});
+		if (peers && profile) {
+			const recipients = Array.from(
+				new Set(
+					[...(peers ?? []).map((peer) => peer.peerId)].filter(
+						(peerId) => peerId && peerId !== profile.username,
+					),
+				),
+			);
+			await Promise.all(
+				recipients.map((to) =>
+					sendMessage.mutateAsync({
+						from: profile.username,
+						to,
+						type: "DIRECT_MESSAGE",
+						data: JSON.stringify({
+							type: "INCIDENT_RESOLVE",
+							data: { incidentId: id },
+						}),
+					}),
+				),
+			);
+		}
 	};
 
 	const handleSaveProfile = (e: React.FormEvent<HTMLFormElement>) => {
