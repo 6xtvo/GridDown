@@ -12,13 +12,8 @@
 
 import { useEffect, useRef } from "react";
 import { getNetwork } from "@/lib/p2p-network";
-import type { P2PMessage } from "@/server/p2p-types";
 import { api } from "@/trpc/react";
-
-interface UseP2POptions {
-	peerId: string;
-	onMessage?: (message: P2PMessage) => void;
-}
+import type { P2PMessage, UseP2POptions } from "@/types/p2p";
 
 export function useP2P({ peerId, onMessage }: UseP2POptions) {
 	const network = useRef(getNetwork());

@@ -1,75 +1,45 @@
-# GridDown
+<img align="center" src=".github/assets/banner.png" alt="GridDown Banner">
+<hr>
+<div align="center">
+  <img alt="GitHub deployments" src="https://img.shields.io/github/deployments/6xtvo/GridDown/Production%20?style=for-the-badge&label=Deployment">
+  <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/6xtvo/GridDown?style=for-the-badge">
+  <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/6xtvo/GridDown?style=for-the-badge&color=red">
+  <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/6xtvo/GridDown?style=for-the-badge&color=yellow">
+</div>
 
-## Contributing
-### Branch naming
+## Overview
+GridDown is the submission for the [GDGC](https://gdg.community.dev/gdg-on-campus-the-university-of-auckland-auckland-new-zealand/) (Google Developer Groups on Campus) 2026 Hackathon by our team, Team Buckley.
 
-Branches follow the format `<type>/<short-description>`, where `type` matches one of the conventional commit types below.
+## The Problem
+A solar flare has impacted earth. Internet and power is still up, but server data has been corrupted, rendering them unreliable and useless.
 
-```
-feat/live-commit-webhook
-fix/discord-identity-dedup
-chore/upgrade-prisma
-docs/db-migration-workflow
-```
+Food, medicine, shelter, skills - they exist but aren't where they're needed. How do you match supply to demand across a city with no central
+coordinator? Our team chose to focus on the issue of **Resources without coordination**.
 
-Keep the description lowercase and hyphen-separated. Avoid vague names like `patch`, `updates`, or `wip`.
+You can view read more of the hackathon theme and brief [here](.github/assets/brief.pdf).
 
-## Commit messages
+## The Solution
+When the grid goes down, that's where GridDown steps in. We built a de-centralised emergency co-ordination system application to remove the need for reliance on corrupted servers.
 
-All commits must follow the [Conventional Commits](https://www.conventionalcommits.org) specification. Non-conforming commits are rejected by the pre-commit hook (commitlint + Husky).
+GridDown allows anyone to broadcast requests for help and set the urgency of these requests, offers to help, or announcements, and set the locations for these broadcasts. Users can set their location upon onboarding, as well as their name, age and skillset, and the closest broadcasts and their urgency will be prioritised and displayed on a live board. On the right, users can view the shortest path and distance from the locations of these broadcasts on a live, interactive map.
 
-```
-<type>(<optional scope>): <description>
-```
+To implement a trust-building feature, GridDown allows users to upvote or downvote broadcasts, and a chatting feature also enables users to communicate with broadcast offers.
 
-- Subject line: lowercase, imperative mood, no trailing period, ≤ 72 characters
-- Body (optional): explain _why_, not what — the diff shows what changed
+## The Approach
+Initially, our project adopted a client-server model with Next.js, tRPC, Tailwind, NextAuth, Prisma and PostgreSQL.
 
-**Allowed types:**
+With the transition to a serverless P2P implementation with WebRTC, NextAuth, Prisma and PostgreSQL was no longer needed. tRPC remained to serve as a signalling server for SDP and ICE candidate transmission.
 
-| Type       | Use for                                  |
-| ---------- | ---------------------------------------- |
-| `feat`     | New user-facing functionality            |
-| `fix`      | Bug fix                                  |
-| `docs`     | Documentation only                       |
-| `style`    | Formatting, whitespace — no logic change |
-| `refactor` | Restructure with no behaviour change     |
-| `perf`     | Performance improvement                  |
-| `test`     | Adding or correcting tests               |
-| `chore`    | Tooling, dependencies, config            |
-| `ci`       | CI/CD pipeline changes                   |
-| `build`    | Build system changes                     |
-| `revert`   | Reverts a previous commit                |
+You can read more about our implementation in [architecture.md](docs/architecture.md) and how WebRTC works with our codebase in [webrtc.md](docs/webrtc.md). 
 
-**Scopes** are optional but useful — use the package or area changed: `web`, `worker`, `db`, `auth`, `github`, `discord`, `llm`.
+## Team Buckley
 
-```
-feat(worker): add retry logic to discord ingestion
-fix(db): correct unique constraint on PersonIdentity
-chore(web): upgrade to Next.js 15.1
-```
+| <img src="https://avatars.githubusercontent.com/u/72182515?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/78674065?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/264532820?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/99226158?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/102767502?v=4" width="200"> |
+|-|-|-|-|-|
+| [Benjamin Kee](https://github.com/6xtvo) | [Tommy Duan](https://github.com/tommy-duan-github) | [Wilson Mao](FuzeShieldMeta) | [Gladwyn Chua](https://github.com/GladwynChua) | [Gloria Chan](Aname326) |
+| Team Leader<br>Developer | Developer | Developer | Developer | Developer |
 
-## Merging and rebasing
-
-Favour rebasing over merge commits — it keeps history linear and makes it easier to follow what changed and why.
-
-Before opening a PR, rebase onto the latest `main`:
-
-```bash
-git fetch origin
-git rebase origin/master
-```
-
-Rebase regularly when `main` is active. Smaller, frequent rebases are easier to resolve than one big conflict at the end.
-
-After rebasing, push with `--force-with-lease` (never bare `--force`):
-
-```bash
-git push --force-with-lease origin <your-branch>
-```
-
-`--force-with-lease` is only needed when the branch already exists on the remote — rebasing rewrites commit hashes, so Git would otherwise reject the push to protect the remote's history. If the branch hasn't been pushed yet, a regular push is fine:
-
-```bash
-git push -u origin <your-branch>
-```
+## Links
+* [Website](https://buckley-prod.vercel.app/)
+* [Presentation](https://buckley-presents.vercel.app/)
+* [More on GDGC](https://gdg.community.dev/gdg-on-campus-the-university-of-auckland-auckland-new-zealand/)

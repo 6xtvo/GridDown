@@ -1,3 +1,19 @@
+import { z } from "zod";
+import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
+import { lanDiscovery } from "@/services/lan-discovery";
+import { PeerRegistry } from "@/services/peer-registry";
+import { webrtcManager } from "@/services/webrtc-manager";
+
+// Persist registry across Next.js hot reloads
+const globalForP2P = globalThis as { __peerRegistry?: PeerRegistry };
+
+function getRegistry(): PeerRegistry {
+	if (!globalForP2P.__peerRegistry) {
+		globalForP2P.__peerRegistry = new PeerRegistry();
+	}
+	return globalForP2P.__peerRegistry;
+}
+
 /**
  * P2P tRPC Router
  * Handles peer registration, WebRTC signalling, and message passing.
@@ -9,23 +25,6 @@
  * 4. Once WebRTC is connected, messages go peer-to-peer (not through server)
  * 5. If WebRTC fails, messages fall back to sendMessage() / getMessages()
  */
-
-import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
-import { lanDiscovery } from "@/server/lan-discovery";
-import { MemoryPeerRegistry } from "@/server/peer-registry";
-import { webrtcManager } from "@/server/webrtc-manager";
-
-// Persist registry across Next.js hot reloads
-const globalForP2P = globalThis as { __peerRegistry?: MemoryPeerRegistry };
-
-function getRegistry(): MemoryPeerRegistry {
-	if (!globalForP2P.__peerRegistry) {
-		globalForP2P.__peerRegistry = new MemoryPeerRegistry();
-	}
-	return globalForP2P.__peerRegistry;
-}
-
 export const p2pRouter = createTRPCRouter({
 	/**
 	 * Register yourself as an online peer.
@@ -49,9 +48,12 @@ export const p2pRouter = createTRPCRouter({
 				metadata: input.metadata,
 				lastSeen: Date.now(),
 			};
+
 			await registry.register(peer);
+
 			lanDiscovery.upsertLocalPeer(peer);
 			webrtcManager.registerConnection(input.peerId, input.metadata);
+
 			return { success: true, peerId: input.peerId };
 		}),
 
@@ -62,9 +64,12 @@ export const p2pRouter = createTRPCRouter({
 		.input(z.object({ peerId: z.string() }))
 		.mutation(async ({ input }) => {
 			const registry = getRegistry();
+
 			await registry.unregister(input.peerId);
+
 			lanDiscovery.removeLocalPeer(input.peerId);
 			webrtcManager.closeConnection(input.peerId);
+
 			return { success: true };
 		}),
 
@@ -75,6 +80,7 @@ export const p2pRouter = createTRPCRouter({
 	listPeers: publicProcedure.query(async () => {
 		const registry = getRegistry();
 		const peers = await registry.list();
+
 		return lanDiscovery.getAllPeers(peers).map((peer) => ({
 			peerId: peer.peerId,
 			ip: peer.ip,
@@ -106,12 +112,14 @@ export const p2pRouter = createTRPCRouter({
 				timestamp: Date.now(),
 			};
 			const destination = lanDiscovery.resolvePeer(input.to);
+
 			if (destination.kind === "remote" && destination.relayUrls) {
 				await lanDiscovery.forwardSignal(destination.relayUrls, signal);
 				return { success: true, relayed: true };
 			}
 
 			webrtcManager.queueSignal(signal);
+
 			return { success: true };
 		}),
 
@@ -148,6 +156,7 @@ export const p2pRouter = createTRPCRouter({
 				timestamp: Date.now(),
 			};
 			const destination = lanDiscovery.resolvePeer(input.to);
+
 			if (destination.kind === "remote" && destination.relayUrls) {
 				await lanDiscovery.forwardMessage(destination.relayUrls, message);
 				return { success: true, relayed: true };
@@ -159,6 +168,7 @@ export const p2pRouter = createTRPCRouter({
 				data: message.data,
 				timestamp: message.timestamp,
 			});
+
 			return { success: true };
 		}),
 
@@ -192,7 +202,9 @@ export const p2pRouter = createTRPCRouter({
 		.mutation(async ({ input }) => {
 			const registry = getRegistry();
 			const removed = await registry.cleanup(input.maxAge);
+
 			lanDiscovery.setLocalPeers(await registry.list());
+
 			return { removed };
 		}),
 
@@ -204,10 +216,12 @@ export const p2pRouter = createTRPCRouter({
 		.query(async ({ input }) => {
 			const registry = getRegistry();
 			const localPeer = await registry.get(input.peerId);
+
 			if (localPeer) return localPeer;
 
 			const allPeers = lanDiscovery.getAllPeers(await registry.list());
 			const peer = allPeers.find((p) => p.peerId === input.peerId) ?? null;
+
 			return peer ?? null;
 		}),
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { lanDiscovery } from "@/server/lan-discovery";
-import { webrtcManager } from "@/server/webrtc-manager";
+import { lanDiscovery } from "@/services/lan-discovery";
+import { webrtcManager } from "@/services/webrtc-manager";
 
 export const runtime = "nodejs";
 

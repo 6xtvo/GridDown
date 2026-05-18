@@ -272,7 +272,7 @@ export function QuickGuide() {
 						})}
 					</div>
 
-					{/* Footer — progress indicators */}
+					{/* Footer - progress indicators */}
 					<div
 						className="flex items-center justify-end px-4 py-2"
 						style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}

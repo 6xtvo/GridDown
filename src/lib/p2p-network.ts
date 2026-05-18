@@ -9,15 +9,8 @@
  *   network.broadcast({ from: peerId, type: "chat", data: "hello", timestamp: Date.now() });
  */
 
-import type { P2PMessage, WebRTCSignal } from "@/server/p2p-types";
-
-type SignalSender = (signal: WebRTCSignal) => void;
-
-interface NetworkConfig {
-	peerId: string;
-	iceServers?: RTCIceServer[];
-	sendSignal: SignalSender;
-}
+import type { NetworkConfig, SignalSender } from "@/types/network";
+import type { P2PMessage, WebRTCSignal } from "@/types/p2p";
 
 class P2PNetwork {
 	private peerId: string | null = null;

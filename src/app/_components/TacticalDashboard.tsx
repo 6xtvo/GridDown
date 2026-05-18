@@ -352,7 +352,7 @@ export function TacticalDashboard() {
 						changed = true;
 					}
 				} catch {
-					/* malformed message — ignore */
+					/* malformed message - ignore */
 				}
 			});
 			if (changed) {
@@ -603,7 +603,7 @@ export function TacticalDashboard() {
 					eta: Math.ceil(d.routes[0].duration / 60),
 				});
 		} catch {
-			/* routing failed — silent */
+			/* routing failed - silent */
 		} finally {
 			setRouting(false);
 		}
