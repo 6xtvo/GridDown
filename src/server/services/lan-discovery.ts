@@ -6,8 +6,9 @@ import type {
 	PeerLocation,
 	RelayPayload,
 	RemoteNode,
-} from "@/types/lan-discovery";
-import type { PeerInfo, WebRTCSignal } from "@/types/p2p";
+} from "@/types/lan";
+import type { WebRTCSignal } from "@/types/network";
+import type { PeerInfo } from "@/types/p2p";
 import {
 	getBroadcastAddress,
 	getIPv4Interfaces,
@@ -15,7 +16,7 @@ import {
 	resolveBaseUrl,
 	resolveRelayUrls,
 	withLanMetadata,
-} from "@/utils/lan-discovery";
+} from "@/utils/lan";
 
 const DISCOVERY_PORT = Number(process.env.LAN_DISCOVERY_PORT ?? 41235);
 const DISCOVERY_GROUP = process.env.LAN_DISCOVERY_MULTICAST ?? "239.255.42.99";

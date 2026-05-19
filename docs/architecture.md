@@ -4,7 +4,6 @@ The system builds a peer-to-peer mesh where browsers talk directly to each other
 ## Layer 1: Types (`p2p-types.ts`)
 Three shared shapes used everywhere:
 
-## PeerInfo - who a peer is (id, IP, metadata, last heartbeat)
 * `PeerInfo` - who a peer is (id, IP, metadata, last heartbeat)
 * `WebRTCSignal` - a signaling envelope: `offer`, `answer`, or `ice-candidate`, with `from`/`to` peer IDs
 * `P2PMessage` - the actual application data once peers are connected

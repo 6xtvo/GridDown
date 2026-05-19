@@ -5,6 +5,7 @@ import { JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 
 import { TRPCReactProvider } from "@/trpc/react";
+import { cn } from "@/utils/tailwind";
 
 export const metadata: Metadata = {
 	title: "GridDown | Urgency Board",
@@ -29,7 +30,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
 	return (
 		<html
-			className={`${sevenSegment.variable} ${jetbrains.variable} bg-black`}
+			className={cn(sevenSegment.variable, jetbrains.variable, "bg-black")}
 			lang="en"
 		>
 			<body className="font-jetbrains">

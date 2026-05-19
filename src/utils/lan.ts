@@ -1,6 +1,6 @@
 import os from "node:os";
 
-import type { IPv4Interface } from "@/types/lan-discovery";
+import type { IPv4Interface } from "@/types/network";
 import type { PeerInfo } from "@/types/p2p";
 
 /**

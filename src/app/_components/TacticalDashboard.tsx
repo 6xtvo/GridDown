@@ -7,7 +7,6 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { z } from "zod";
 import { api } from "@/trpc/react";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const SKILL_OPTIONS = [
 	"Medic",
 	"Field Surgery",
@@ -232,7 +231,6 @@ export function TacticalDashboard() {
 			{ enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
 		);
 	};
-	// ─────────────────────────────────────────────────────────────────
 
 	const [chatImage, setChatImage] = useState<string | null>(null);
 	const chatFileRef = useRef<HTMLInputElement>(null);
@@ -267,7 +265,6 @@ export function TacticalDashboard() {
 
 	const base = profile ?? DEFAULT_LOCATION;
 
-	// ─── tRPC ─────────────────────────────────────────────────────────────────
 	const { data: peers } = api.p2p.listPeers.useQuery(undefined, {
 		refetchInterval: 3000,
 		enabled: mounted,
@@ -278,8 +275,6 @@ export function TacticalDashboard() {
 		{ peerId: profile?.username ?? "" },
 		{ refetchInterval: 2000, enabled: mounted && !!profile },
 	);
-
-	// ─── Chat helpers ─────────────────────────────────────────────────────────
 	const getChatMessageId = (
 		room: string,
 		message: { msgId?: string; time: number; from: string; text: string },
@@ -845,7 +840,6 @@ export function TacticalDashboard() {
 		"unsupported",
 	].includes(geoStatus);
 
-	// ─── Render ───────────────────────────────────────────────────────────────
 	return (
 		<>
 			<style>{`

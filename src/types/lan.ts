@@ -1,4 +1,5 @@
-import type { P2PMessage, PeerInfo, WebRTCSignal } from "./p2p";
+import type { WebRTCSignal } from "./network";
+import type { P2PMessage, PeerInfo } from "./p2p";
 
 /**
  * Payload sent through the relay server.
@@ -81,15 +82,4 @@ export interface PeerLocation {
 
 	/** Relay URLs that can forward traffic to this peer - present when `kind` is "remote". */
 	relayUrls?: string[];
-}
-
-/**
- * A single IPv4 network interface on the local machine.
- */
-export interface IPv4Interface {
-	/** The interface's IPv4 address (e.g. `"192.168.1.42"`). */
-	address: string;
-
-	/** The subnet mask (e.g. `"255.255.255.0"`). */
-	netmask: string;
 }

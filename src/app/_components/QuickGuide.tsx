@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-// ─── Step definitions ─────────────────────────────────────────────────────────
 const STEPS = [
 	{
 		num: "01",
@@ -61,7 +60,6 @@ const CORNER_CLASSES = [
 	"bottom-0 right-0 border-b border-r",
 ] as const;
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export function QuickGuide() {
 	const [isOpen, setIsOpen] = useState(false);
 	const [activeStep, setActiveStep] = useState<number | null>(null);

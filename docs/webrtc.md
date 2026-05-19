@@ -44,7 +44,7 @@ Knowing your external address isn't enough. Your router is still going to drop a
 ICE is the algorithm that figures out how two peers can actually reach each other. It works by gathering a list of candidates - possible addresses where you might be reachable:
 - Host candidates - your actual local IP (`192.168.1.5:PORT`). Useful on LANs.
 - Server-reflexive candidates - your external IP/port discovered via STUN (`203.0.113.7:54321`). Useful over the internet.
-- Relay candidates - a [TURN](#problem-3-when-hole-punching-fails-turn-relay) server's address. The fallback.
+- Relay candidates - a [TURN](#problem-3-when-hole-punching-fails---turn-relay) server's address. The fallback.
 
 Each peer gathers their own candidates and sends them to the other peer via the signalling server. Nobody discovers the other's addresses - each peer reports their own.
 

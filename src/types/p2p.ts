@@ -19,29 +19,6 @@ export interface PeerInfo {
 }
 
 /**
- * A WebRTC signalling message exchanged between peers during connection setup.
- */
-export interface WebRTCSignal {
-	/** Optional unique identifier for this signal message. */
-	id?: string;
-
-	/** Peer ID of the sender. */
-	from: string;
-
-	/** Peer ID of the intended recipient. */
-	to: string;
-
-	/** Signal type - drives the WebRTC handshake state machine. */
-	type: "offer" | "answer" | "ice-candidate";
-
-	/** Signal payload (SDP or ICE candidate serialised as a plain object). */
-	data: Record<string, unknown>;
-
-	/** Unix timestamp (ms) of when this signal was created. */
-	timestamp: number;
-}
-
-/**
  * An application-level message sent over an established P2P data channel.
  */
 export interface P2PMessage {

@@ -8,7 +8,7 @@
 </div>
 
 ## Overview
-GridDown is the submission for the [GDGC](https://gdg.community.dev/gdg-on-campus-the-university-of-auckland-auckland-new-zealand/) (Google Developer Groups on Campus) 2026 Hackathon by our team, Team Buckley.
+GridDown is the 🥇 1st place submission for the [GDGC](https://gdg.community.dev/gdg-on-campus-the-university-of-auckland-auckland-new-zealand/) (Google Developer Groups on Campus) 2026 Hackathon by our team, Team Buckley.
 
 ## The Problem
 A solar flare has impacted earth. Internet and power is still up, but server data has been corrupted, rendering them unreliable and useless.
@@ -40,6 +40,6 @@ You can read more about our implementation in [architecture.md](docs/architectur
 | Team Leader<br>Developer | Developer | Developer | Developer | Developer |
 
 ## Links
-* [Website](https://buckley-prod.vercel.app/)
+* [Website](https://griddown.vercel.app/)
 * [Presentation](https://buckley-presents.vercel.app/)
 * [More on GDGC](https://gdg.community.dev/gdg-on-campus-the-university-of-auckland-auckland-new-zealand/)

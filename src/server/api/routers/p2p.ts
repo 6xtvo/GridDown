@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
-import { lanDiscovery } from "@/services/lan-discovery";
-import { PeerRegistry } from "@/services/peer-registry";
-import { webrtcManager } from "@/services/webrtc-manager";
+import { lanDiscovery } from "@/server/services/lan-discovery";
+import { PeerRegistry } from "@/server/services/peer-registry";
+import { webrtcManager } from "@/server/services/webrtc-manager";
 
 // Persist registry across Next.js hot reloads
 const globalForP2P = globalThis as { __peerRegistry?: PeerRegistry };
