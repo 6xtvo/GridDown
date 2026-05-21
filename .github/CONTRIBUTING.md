@@ -14,7 +14,7 @@ Keep the description lowercase and hyphen-separated. Avoid vague names like `pat
 
 ## Commit messages
 
-All commits must follow the [Conventional Commits](https://www.conventionalcommits.org) specification. Non-conforming commits are rejected by the pre-commit hook (commitlint + Husky).
+All commits must follow the [Conventional Commits](https://www.conventionalcommits.org) specification. Non-conforming commits are rejected by the pre-commit hook (commitlint + lefthook).
 
 ```
 <type>(<optional scope>): <description>

@@ -1,7 +1,9 @@
+# Architecture
+
 ## The Big Picture
 The system builds a peer-to-peer mesh where browsers talk directly to each other via WebRTC data channels. The Next.js server only exists to bootstrap connections - once two peers are linked, traffic flows browser-to-browser with zero server involvement. There's also a LAN discovery layer so multiple Next.js server instances on the same network can find each other.
 
-## Layer 1: Types (`p2p-types.ts`)
+## Layer 1: Types
 Three shared shapes used everywhere:
 
 * `PeerInfo` - who a peer is (id, IP, metadata, last heartbeat)

@@ -1,0 +1,219 @@
+/* Scanlines */
+.scanlines::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: 9000;
+	pointer-events: none;
+	background: repeating-linear-gradient(
+		0deg,
+		transparent,
+		transparent 3px,
+		rgba(0, 0, 0, 0.06) 3px,
+		rgba(0, 0, 0, 0.06) 4px
+	);
+}
+
+/* Red dot grid */
+.bgGrid::after {
+	content: "";
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	opacity: 0.022;
+	background-image:
+		linear-gradient(rgba(220, 38, 38, 1) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(220, 38, 38, 1) 1px, transparent 1px);
+	background-size: 80px 80px;
+}
+
+/* Hero eyebrow flanking lines */
+.heroEyebrow::before,
+.heroEyebrow::after {
+	content: "";
+	width: 20px;
+	height: 1px;
+	background: #dc2626;
+	opacity: 0.5;
+}
+
+/* Radar sweep line */
+.heroSweep::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 50%;
+	height: 1px;
+	background: linear-gradient(to right, rgba(220, 38, 38, 0.45), transparent);
+	transform-origin: 0 50%;
+}
+
+/* Cross hair lines */
+.heroCross::before {
+	content: "";
+	position: absolute;
+	width: 1400px;
+	height: 1px;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(220, 38, 38, 0.06),
+		rgba(220, 38, 38, 0.1),
+		rgba(220, 38, 38, 0.06),
+		transparent
+	);
+	top: 0;
+	left: 50%;
+	transform: translateX(-50%);
+}
+.heroCross::after {
+	content: "";
+	position: absolute;
+	width: 1px;
+	height: 900px;
+	background: linear-gradient(
+		180deg,
+		transparent,
+		rgba(220, 38, 38, 0.06),
+		rgba(220, 38, 38, 0.1),
+		rgba(220, 38, 38, 0.06),
+		transparent
+	);
+	left: 0;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+/* Section label leading line */
+.sLabel::before {
+	content: "";
+	width: 20px;
+	height: 1px;
+	background: #dc2626;
+}
+
+/* Skill tag left-edge reveal bar */
+.sk::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	background: #dc2626;
+	transform: scaleY(0);
+	transition: transform 0.18s;
+}
+.sk:hover::before {
+	transform: scaleY(1);
+}
+
+/* Step number dims on parent hover */
+.step:hover .stepNumber {
+	color: rgba(220, 38, 38, 0.08);
+}
+
+/* Scroller - hide scrollbar */
+.scroller::-webkit-scrollbar {
+	display: none;
+}
+
+/* Ring sizes via nth-child */
+.hring:nth-child(1) {
+	width: 260px;
+	height: 260px;
+	animation-delay: 0s;
+}
+.hring:nth-child(2) {
+	width: 480px;
+	height: 480px;
+	animation-delay: 0.7s;
+}
+.hring:nth-child(3) {
+	width: 700px;
+	height: 700px;
+	animation-delay: 1.4s;
+}
+.hring:nth-child(4) {
+	width: 920px;
+	height: 920px;
+	animation-delay: 2.1s;
+}
+
+/* ── Keyframes (referenced by Tailwind animate-* classes in globals.css) ── */
+@keyframes hringBreath {
+	0%,
+	100% {
+		opacity: 0.9;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.25;
+		transform: scale(1.015);
+	}
+}
+
+@keyframes sweepSpin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes slideUp {
+	from {
+		opacity: 0;
+		transform: translateY(24px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes fadeIn {
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes linePulse {
+	0%,
+	100% {
+		opacity: 0.3;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+@keyframes blink {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.15;
+	}
+}
+
+/* Apply keyframes to the elements that need them */
+.hring {
+	animation: hringBreath 5s ease-in-out infinite;
+}
+.heroSweep {
+	animation: sweepSpin 10s linear infinite;
+}
+.heroContent {
+	animation: slideUp 0.8s ease both;
+}
+.scrollHint {
+	animation: fadeIn 0.5s 1.2s ease both;
+}
+.scrollLine {
+	animation: linePulse 2.2s ease-in-out infinite;
+}
+.ctaWarnDot {
+	animation: blink 1.6s ease-in-out infinite;
+}

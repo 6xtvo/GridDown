@@ -374,7 +374,7 @@ const globalForP2P = globalThis as { __p2pNetwork?: P2PNetwork };
 
 /**
  * Returns the global {@link P2PNetwork} singleton.
- * Safe to call multiple times — always returns the same instance.
+ * Safe to call multiple times - always returns the same instance.
  */
 export function getNetwork(): P2PNetwork {
 	globalForP2P.__p2pNetwork ??= new P2PNetwork();

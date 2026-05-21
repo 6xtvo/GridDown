@@ -10,7 +10,7 @@ import type { P2PMessage, UseP2POptions } from "@/types/p2p";
  *
  * Handles registration, ICE server configuration, peer discovery, signal
  * exchange, and message delivery. The server is only involved during the
- * initial handshake — once WebRTC data channels are open, all traffic is
+ * initial handshake - once WebRTC data channels are open, all traffic is
  * peer-to-peer.
  *
  * @example
@@ -54,7 +54,7 @@ export function useP2P({ peerId, onMessage }: UseP2POptions) {
 		return () => {
 			unregisterMutation.mutate({ peerId });
 		};
-		// Mutations are intentionally excluded — their identity changes on every
+		// Mutations are intentionally excluded - their identity changes on every
 		// render but the underlying RPC call is stable.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [peerId]);

@@ -1,0 +1,17 @@
+.navLogoMark::after {
+	content: "";
+	position: absolute;
+	inset: 4px;
+	border: 1px solid rgba(220, 38, 38, 0.25);
+	animation: markPulse 3s ease-in-out infinite;
+}
+
+@keyframes markPulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.2;
+	}
+}

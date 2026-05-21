@@ -3,14 +3,14 @@ import "@/styles/globals.css";
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
-
+import Cursor from "@/app/_components/Cursor";
 import { TRPCReactProvider } from "@/trpc/react";
 import { cn } from "@/utils/tailwind";
 
 export const metadata: Metadata = {
-	title: "GridDown | Urgency Board",
+	title: "GridDown | Emergency Co-Ordination System.",
 	description:
-		"Tactical communication and supply tracking during grid failure.",
+		"When the grid goes down, GridDown serves as an emergency co-ordination system, enabling seamless communication and resource sharing among affected parties via peer-to-peer connections.",
 	icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 

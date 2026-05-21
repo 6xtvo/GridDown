@@ -36,10 +36,17 @@ You can read more about our implementation in [architecture.md](docs/architectur
 
 | <img src="https://avatars.githubusercontent.com/u/72182515?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/78674065?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/264532820?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/99226158?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/102767502?v=4" width="200"> |
 |-|-|-|-|-|
-| [Benjamin Kee](https://github.com/6xtvo) | [Tommy Duan](https://github.com/tommy-duan-github) | [Wilson Mao](FuzeShieldMeta) | [Gladwyn Chua](https://github.com/GladwynChua) | [Gloria Chan](Aname326) |
+| [Benjamin Kee](https://github.com/6xtvo) | [Tommy Duan](https://github.com/tommy-duan-github) | [Wilson Mao](https://github.com/tommy-duan-github/FuzeShieldMeta) | [Gladwyn Chua](https://github.com/GladwynChua) | [Gloria Chan](https://github.com/tommy-duan-github/Aname326) |
 | Team Leader<br>Developer | Developer | Developer | Developer | Developer |
+
+## Contributing
+This project is closed to contributions. For team members, the contributing guide is under [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ## Links
 * [Website](https://griddown.vercel.app/)
 * [Presentation](https://buckley-presents.vercel.app/)
+* [Presentation Repository](https://github.com/6xtvo/griddown-presentation)
 * [More on GDGC](https://gdg.community.dev/gdg-on-campus-the-university-of-auckland-auckland-new-zealand/)
+
+## License
+This project is licensed under the [GNU General Public License v3.0](.github/LICENSE.md).
