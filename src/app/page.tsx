@@ -90,7 +90,6 @@ const STEPS = [
 const rv = (n: number) =>
 	`opacity-0 translate-y-[18px] transition-[opacity,transform] duration-[550ms] ease-out ${DELAYS[n]}`;
 
-// Uses --faint for border, keeps dark bg
 const CARD: React.CSSProperties = {
 	border: "1px solid var(--faint)",
 	background: "rgba(8,2,2,0.5)",
@@ -179,8 +178,8 @@ export default function HomePage() {
 			>
 				<Nav />
 
-				{/* ── Side bar nav dots ── */}
-				<div className="fixed right-6 top-1/2 -translate-y-1/2 z-400 flex flex-col gap-3 items-center">
+				{/* ── Side bar nav dots — hidden on mobile ── */}
+				<div className="hidden md:flex fixed right-6 top-1/2 -translate-y-1/2 z-400 flex-col gap-3 items-center">
 					{[0, 1, 2, 3, 4].map((i) => (
 						<div
 							className="cursor-none"
@@ -228,30 +227,30 @@ export default function HomePage() {
 						<div className="absolute inset-0 pointer-events-none z-2 bg-[radial-gradient(ellipse_at_50%_50%,transparent_25%,rgba(2,2,2,0.88)_100%)]" />
 
 						<div
-							className={`relative z-10 flex flex-col items-center gap-8 ${s.heroContent}`}
+							className={`relative z-10 flex flex-col items-center gap-6 md:gap-8 px-6 ${s.heroContent}`}
 						>
 							<div
 								className={`text-[8px] tracking-[0.45em] text-red-600 flex items-center gap-2 ${s.heroEyebrow}`}
 							>
 								EMERGENCY COORDINATION
 							</div>
-							<h1 className="text-[clamp(64px,11vw,128px)] tracking-[0.12em] leading-[0.9] text-white">
+							<h1 className="text-[clamp(52px,16vw,128px)] tracking-[0.12em] leading-[0.9] text-white">
 								GRID<span className="text-red-600">DOWN</span>
 							</h1>
-							<p className="text-[10px] tracking-[0.22em] text-(--dim) max-w-115 leading-loose">
+							<p className="text-[10px] tracking-[0.22em] text-(--dim) max-w-[280px] md:max-w-115 leading-loose">
 								A peer-to-peer coordination tool for when
-								<br />
-								conventional infrastructure has failed.
+								<br className="hidden md:block" /> conventional infrastructure
+								has failed.
 							</p>
-							<div className="flex gap-4 mt-2">
+							<div className="flex gap-3 md:gap-4 mt-2 flex-wrap justify-center">
 								<Link
-									className="text-[9px] tracking-[0.28em] px-7 py-3.25 text-red-300 no-underline border border-red-600/40 bg-red-600/8 transition-all duration-180 hover:bg-red-600/17 hover:shadow-[0_0_24px_rgba(220,38,38,0.2)] cursor-none"
+									className="text-[9px] tracking-[0.28em] px-6 md:px-7 py-3.25 text-red-300 no-underline border border-red-600/40 bg-red-600/8 transition-all duration-180 active:bg-red-600/25 hover:bg-red-600/17 hover:shadow-[0_0_24px_rgba(220,38,38,0.2)] cursor-none"
 									href="/dashboard"
 								>
 									OPEN APP →
 								</Link>
 								<Link
-									className="text-[9px] tracking-[0.28em] px-7 py-3.25 text-(--dim) no-underline border border-(--faint) bg-transparent transition-all duration-180 hover:text-white hover:border-white/20 cursor-none"
+									className="text-[9px] tracking-[0.28em] px-6 md:px-7 py-3.25 text-(--dim) no-underline border border-(--faint) bg-transparent transition-all duration-180 hover:text-white hover:border-white/20 active:text-white cursor-none"
 									href="https://github.com/6xtvo/GridDown"
 									rel="noreferrer"
 									target="_blank"
@@ -275,26 +274,24 @@ export default function HomePage() {
 
 					{/* ────────────────── HOW IT WORKS ────────────────── */}
 					<section
-						className="h-screen snap-start snap-always relative flex flex-col justify-center pt-13 overflow-hidden"
+						className="min-h-screen snap-start snap-always relative flex flex-col justify-center pt-13 overflow-hidden"
 						data-slide-panel
 					>
-						<div
-							className="max-w-300 w-full mx-auto px-20 flex flex-col justify-center gap-12"
-							style={{ height: "calc(100vh - 52px)" }}
-						>
+						<div className="max-w-300 w-full mx-auto px-6 md:px-20 py-10 md:py-0 flex flex-col justify-center gap-8 md:gap-12">
 							<div>
 								<SectionLabel className={rv(1)} data-rv label="HOW IT WORKS" />
 								<h2
-									className={`text-[clamp(26px,3.5vw,42px)] tracking-[0.12em] text-white leading-[1.1] mt-3 ${rv(2)}`}
+									className={`text-[clamp(22px,5vw,42px)] tracking-[0.12em] text-white leading-[1.1] mt-3 ${rv(2)}`}
 									data-rv
 								>
 									FOUR STEPS TO <span className="text-red-600">COORDINATE</span>
 								</h2>
 							</div>
-							<div className="grid grid-cols-4 gap-4">
+							{/* 1 col on mobile, 2 on sm, 4 on lg */}
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 								{STEPS.map(({ n, name, desc, icon }, i) => (
 									<div
-										className={`group p-8 transition-[border-color,background] duration-250 hover:bg-red-600/2.5 ${rv(i + 3)} ${s.step}`}
+										className={`group p-6 md:p-8 transition-[border-color,background] duration-250 hover:bg-red-600/2.5 active:bg-red-600/5 ${rv(i + 3)} ${s.step}`}
 										data-rv
 										key={n}
 										onMouseEnter={(e) =>
@@ -328,35 +325,26 @@ export default function HomePage() {
 
 					{/* ────────────────── FEATURES ────────────────── */}
 					<section
-						className="h-screen snap-start snap-always relative flex flex-col justify-center pt-13 overflow-hidden"
+						className="min-h-screen snap-start snap-always relative flex flex-col justify-center pt-13 overflow-hidden"
 						data-slide-panel
 					>
-						<div
-							className="max-w-300 w-full mx-auto px-20 flex flex-col justify-center gap-12"
-							style={{ height: "calc(100vh - 52px)" }}
-						>
+						<div className="max-w-300 w-full mx-auto px-6 md:px-20 py-10 md:py-0 flex flex-col justify-center gap-8 md:gap-12">
 							<div>
 								<SectionLabel className={rv(1)} data-rv label="FEATURES" />
 								<h2
-									className={`text-[clamp(26px,3.5vw,42px)] tracking-[0.12em] text-white leading-[1.1] mt-3 ${rv(2)}`}
+									className={`text-[clamp(22px,5vw,42px)] tracking-[0.12em] text-white leading-[1.1] mt-3 ${rv(2)}`}
 									data-rv
 								>
 									WHAT&apos;S <span className="text-red-600">INSIDE</span>
 								</h2>
 							</div>
 
-							<div
-								className="grid gap-4"
-								style={{
-									gridTemplateColumns: "1fr 1fr",
-									gridTemplateRows: "1fr 1fr",
-									height: "clamp(340px, calc(100vh - 300px), 480px)",
-								}}
-							>
+							{/* 1 col mobile, 2 col sm+ */}
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 								{FEATURES.map(
 									({ tag, tagColor, tagBorder, tagBg, title, desc }, i) => (
 										<div
-											className={`p-8 flex flex-col ${rv(i + 3)}`}
+											className={`p-6 md:p-8 flex flex-col ${rv(i + 3)}`}
 											data-rv
 											key={tag}
 											onMouseEnter={(e) =>
@@ -400,13 +388,10 @@ export default function HomePage() {
 
 					{/* ────────────────── SKILLS ────────────────── */}
 					<section
-						className="h-screen snap-start snap-always relative flex flex-col justify-center pt-13 overflow-hidden"
+						className="min-h-screen snap-start snap-always relative flex flex-col justify-center pt-13 overflow-hidden"
 						data-slide-panel
 					>
-						<div
-							className="max-w-300 w-full mx-auto px-20 flex flex-col justify-center gap-12"
-							style={{ height: "calc(100vh - 52px)" }}
-						>
+						<div className="max-w-300 w-full mx-auto px-6 md:px-20 py-10 md:py-0 flex flex-col justify-center gap-8 md:gap-12">
 							<div>
 								<SectionLabel
 									className={rv(1)}
@@ -414,7 +399,7 @@ export default function HomePage() {
 									label="SKILL REGISTRY"
 								/>
 								<h2
-									className={`text-[clamp(26px,3.5vw,42px)] tracking-[0.12em] text-white leading-[1.1] mt-3 ${rv(2)}`}
+									className={`text-[clamp(22px,5vw,42px)] tracking-[0.12em] text-white leading-[1.1] mt-3 ${rv(2)}`}
 									data-rv
 								>
 									REGISTER YOUR{" "}
@@ -428,10 +413,11 @@ export default function HomePage() {
 									can filter by skill to find the right person fast.
 								</p>
 							</div>
-							<div className="grid grid-cols-5 gap-3">
+							{/* 2 col mobile, 3 col sm, 5 col lg */}
+							<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
 								{SKILLS.map((skill, i) => (
 									<div
-										className={`relative overflow-hidden px-3.5 py-3 text-[8px] tracking-[0.2em] text-(--dim) transition-[color,background,border-color] duration-180 hover:text-(--text) hover:bg-red-600/3 cursor-default ${rv(i + 4)} ${s.sk}`}
+										className={`relative overflow-hidden px-3.5 py-3 text-[8px] tracking-[0.2em] text-(--dim) transition-[color,background,border-color] duration-180 hover:text-(--text) hover:bg-red-600/3 active:bg-red-600/5 cursor-default ${rv(i + 4)} ${s.sk}`}
 										data-rv
 										key={skill}
 										onMouseEnter={(e) =>
@@ -473,7 +459,7 @@ export default function HomePage() {
 						/>
 						<div className="absolute inset-0 pointer-events-none z-2 bg-[radial-gradient(ellipse_at_50%_50%,transparent_25%,rgba(2,2,2,0.88)_100%)]" />
 
-						<div className="relative z-10 flex flex-col items-center gap-8">
+						<div className="relative z-10 flex flex-col items-center gap-6 md:gap-8 px-6">
 							<div
 								className={`flex items-center gap-2 text-[8px] tracking-[0.28em] text-amber-500/65 border border-amber-500/16 px-4 py-2 bg-amber-500/2.5 ${rv(1)}`}
 								data-rv
@@ -484,7 +470,7 @@ export default function HomePage() {
 								EMERGENCY CO-ORDINATION SYSTEM
 							</div>
 							<h2
-								className={`text-[clamp(28px,5vw,60px)] tracking-[0.12em] text-white leading-[1.1] ${rv(2)}`}
+								className={`text-[clamp(26px,7vw,60px)] tracking-[0.12em] text-white leading-[1.1] ${rv(2)}`}
 								data-rv
 							>
 								WHEN THE <span className="text-red-600">GRID</span>
@@ -492,22 +478,25 @@ export default function HomePage() {
 								GOES DARK.
 							</h2>
 							<p
-								className={`text-[10px] tracking-[0.2em] text-(--dim) leading-loose ${rv(3)}`}
+								className={`text-[10px] tracking-[0.2em] text-(--dim) leading-loose max-w-[280px] md:max-w-none ${rv(3)}`}
 								data-rv
 							>
 								Connect in seconds. No accounts. No servers.
-								<br />
-								Just open the app and join the network.
+								<br className="hidden md:block" /> Just open the app and join
+								the network.
 							</p>
-							<div className={`flex gap-4 ${rv(4)}`} data-rv>
+							<div
+								className={`flex gap-3 md:gap-4 flex-wrap justify-center ${rv(4)}`}
+								data-rv
+							>
 								<Link
-									className="text-[9px] tracking-[0.28em] px-7 py-3.25 text-red-300 no-underline border border-red-600/40 bg-red-600/8 transition-all duration-180 hover:bg-red-600/17 hover:shadow-[0_0_24px_rgba(220,38,38,0.2)] cursor-none"
+									className="text-[9px] tracking-[0.28em] px-6 md:px-7 py-3.25 text-red-300 no-underline border border-red-600/40 bg-red-600/8 transition-all duration-180 hover:bg-red-600/17 active:bg-red-600/25 hover:shadow-[0_0_24px_rgba(220,38,38,0.2)] cursor-none"
 									href="/dashboard"
 								>
 									OPEN APP →
 								</Link>
 								<Link
-									className="text-[9px] tracking-[0.28em] px-7 py-3.25 text-(--dim) no-underline border border-(--faint) bg-transparent transition-all duration-180 hover:text-white hover:border-white/20 cursor-none"
+									className="text-[9px] tracking-[0.28em] px-6 md:px-7 py-3.25 text-(--dim) no-underline border border-(--faint) bg-transparent transition-all duration-180 hover:text-white active:text-white hover:border-white/20 cursor-none"
 									href="https://github.com/6xtvo/GridDown"
 									rel="noreferrer"
 									target="_blank"
