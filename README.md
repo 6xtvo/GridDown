@@ -36,7 +36,7 @@ You can read more about our implementation in [architecture.md](docs/architectur
 
 | <img src="https://avatars.githubusercontent.com/u/72182515?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/78674065?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/264532820?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/99226158?v=4" width="200"> | <img src="https://avatars.githubusercontent.com/u/102767502?v=4" width="200"> |
 |-|-|-|-|-|
-| [Benjamin Kee](https://github.com/6xtvo) | [Tommy Duan](https://github.com/tommy-duan-github) | [Wilson Mao](https://github.com/tommy-duan-github/FuzeShieldMeta) | [Gladwyn Chua](https://github.com/GladwynChua) | [Gloria Chan](https://github.com/tommy-duan-github/Aname326) |
+| [Benjamin Kee](https://github.com/6xtvo) | [Tommy Duan](https://github.com/tommy-duan-github) | [Wilson Mao](https://github.com/FuzeShieldMeta) | [Gladwyn Chua](https://github.com/GladwynChua) | [Gloria Chan](https://github.com/Aname326) |
 | Team Leader<br>Developer | Developer | Developer | Developer | Developer |
 
 ## Contributing
